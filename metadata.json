@@ -1,0 +1,5 @@
+{
+  "name": "Valores y Ciencias - Módulo Administrativo",
+  "description": "Sistema de gestión administrativa para la I.E.P. Valores y Ciencias, permitiendo la gestión de personal, estudiantes y asignación dinámica de permisos por aula.",
+  "requestFramePermissions": []
+}
