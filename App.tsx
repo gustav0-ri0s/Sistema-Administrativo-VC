@@ -15,6 +15,7 @@ import { UserRole, AcademicYear, BimestreConfig, Profile } from './types';
 import { academicService, profileService } from './services/database.service';
 import { supabase } from './services/supabase';
 import { AcademicYearProvider, useAcademicYear } from './contexts/AcademicYearContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { Menu, School, Calendar, ChevronDown, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 const createDefaultBimestres = (year: number): BimestreConfig[] => [
@@ -247,7 +248,9 @@ const App: React.FC = () => {
 const AppWithProvider: React.FC = () => {
   return (
     <AcademicYearProvider>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </AcademicYearProvider>
   );
 };

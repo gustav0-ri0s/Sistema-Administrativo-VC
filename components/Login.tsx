@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, LogIn, Loader2 } from 'lucide-react';
+import { Mail, Lock, LogIn, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 interface LoginProps {
@@ -10,12 +10,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
 
     setIsLoading(true);
+    setError(null);
     console.log('Login: Iniciando autenticación para:', email);
     try {
       const loginPromise = supabase.auth.signInWithPassword({
@@ -35,7 +37,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       onLogin(email);
     } catch (error: any) {
       console.error('Login: Error fatal:', error);
-      alert(error.message || 'Error al iniciar sesión. Verifica tu conexión.');
+      // Personalizar mensaje de error si es de credenciales
+      if (error.message === 'Invalid login credentials') {
+        setError('CREDENCIALES INVÁLIDAS. VERIFICA TU CORREO Y CONTRASEÑA.');
+      } else {
+        setError(error.message || 'Error al iniciar sesión. Verifica tu conexión.');
+      }
     } finally {
       console.log('Login: Finalizando estado de carga');
       setIsLoading(false);
@@ -56,7 +63,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="bg-white p-3 rounded-2xl shadow-xl z-10 w-24 h-24 flex items-center justify-center">
             {/* Logo placeholder - En un entorno real sería una etiqueta img */}
             <img
-              src="https://vctarapoto.edu.pe/wp-content/uploads/2021/03/logo_vc.png"
+              src="/image/logo.png"
               alt="Logo Valores y Ciencias"
               className="w-16 h-16 object-contain"
               onError={(e) => {
@@ -77,6 +84,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="p-10 md:p-12 space-y-8">
+
+          {/* Mensaje de Error */}
+          {error && (
+            <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                {error}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block pl-1">

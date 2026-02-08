@@ -4,6 +4,7 @@ import { AcademicYear, YearStatus } from '../types';
 import { academicService } from '../services/database.service';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
 import { canTransitionTo, getTransitionErrorMessage, getBimestreStatusBadge, canEditGrades } from '../utils/academicYear.utils';
+import { useToast } from '../contexts/ToastContext';
 import { Calendar, Power, Lock, Unlock, Plus, CalendarDays, CheckCircle2, AlertCircle, Clock, AlertTriangle } from 'lucide-react';
 
 interface AcademicYearManagerProps {
@@ -14,6 +15,7 @@ interface AcademicYearManagerProps {
 const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsYears, setYears: propsSetYears }) => {
   // Use context for global state
   const { academicYears, refreshYears, selectedYear } = useAcademicYear();
+  const { showToast } = useToast();
 
   // Use context years if available, otherwise use props
   const years = academicYears.length > 0 ? academicYears : propsYears;
@@ -44,10 +46,10 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
       await academicService.activateYear(year.id);
       console.log('AcademicYearManager: Year activated successfully');
       await fetchYears();
-      alert(`Año ${year.year} activado exitosamente`);
+      showToast('success', `Año ${year.year} activado exitosamente`, 'Ciclo Iniciado');
     } catch (e) {
       console.error('AcademicYearManager: Error setting active year:', e);
-      alert('Error al activar el año académico: ' + (e as Error).message);
+      showToast('error', 'Error al activar el año académico: ' + (e as Error).message, 'Error de Activación');
     }
   };
 
@@ -55,7 +57,7 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
     // Validate state transition
     if (!canTransitionTo(currentStatus, newStatus)) {
       const errorMsg = getTransitionErrorMessage(currentStatus, newStatus);
-      alert(errorMsg);
+      showToast('warning', errorMsg, 'Acción no Permitida');
       return;
     }
 
@@ -66,7 +68,7 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
       await fetchYears();
     } catch (e) {
       console.error('AcademicYearManager: Error updating status:', e);
-      alert('Error al actualizar el estado: ' + (e as Error).message);
+      showToast('error', 'Error al actualizar el estado: ' + (e as Error).message, 'Error de Actualización');
     }
   };
 
@@ -78,7 +80,7 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
       await fetchYears();
     } catch (e) {
       console.error('AcademicYearManager: Error toggling lock:', e);
-      alert('Error al cambiar el candado: ' + (e as Error).message);
+      showToast('error', 'Error al cambiar el candado: ' + (e as Error).message, 'Error de Seguridad');
     }
   };
 
@@ -89,10 +91,10 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
       await academicService.createYear(nextYear, 'planificación');
       console.log('AcademicYearManager: Year created successfully');
       await fetchYears();
-      alert(`Ciclo Académico ${nextYear} creado exitosamente`);
+      showToast('success', `Ciclo Académico ${nextYear} creado exitosamente`, 'Nuevo Ciclo');
     } catch (e) {
       console.error('AcademicYearManager: Error creating year:', e);
-      alert('Error al crear el año: ' + (e as Error).message);
+      showToast('error', 'Error al crear el año: ' + (e as Error).message, 'Error de Creación');
     }
   };
 

@@ -3,7 +3,7 @@ import React from 'react';
 import { NAVIGATION_ITEMS, ROLE_LABELS } from '../constants';
 import { Student, AcademicStatus, Profile, UserRole } from '../types';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { LogOut, School, X } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -45,8 +45,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
       `}>
         <div className="p-6 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#57C5D5] rounded-lg">
-              <School className="w-6 h-6 text-white" />
+            <div className="p-2 bg-white rounded-lg">
+              <img src="/image/logo.png" alt="Logo" className="w-6 h-6 object-contain" />
             </div>
             <div>
               <h1 className="font-bold text-sm leading-tight">Valores y Ciencias</h1>
@@ -77,10 +77,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
                 disabled={isRestricted}
                 title={isRestricted ? 'Modo solo lectura - Año cerrado' : ''}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === item.id
-                    ? 'bg-[#57C5D5] text-white shadow-lg shadow-[#57C5D5]/20'
-                    : isRestricted
-                      ? 'text-slate-400 opacity-50 cursor-not-allowed grayscale'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-[#57C5D5] text-white shadow-lg shadow-[#57C5D5]/20'
+                  : isRestricted
+                    ? 'text-slate-400 opacity-50 cursor-not-allowed grayscale'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
                   }`}
               >
                 {item.icon}

@@ -38,7 +38,6 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
 
-  const openYears = academicYears.filter(y => y.status === 'Abierto');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   useEffect(() => {
