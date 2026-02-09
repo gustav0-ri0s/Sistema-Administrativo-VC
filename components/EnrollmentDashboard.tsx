@@ -1,9 +1,10 @@
 
-import React from 'react';
-import { AcademicYear } from '../types';
-import { mockClassrooms, mockProfiles, mockIncidents } from '../services/mockData';
+import React, { useState, useEffect } from 'react';
+import { AcademicYear, IncidentSummary } from '../types';
+import { mockClassrooms, mockProfiles, mockIncidents as fallbackIncidents } from '../services/mockData';
+import { incidentService } from '../services/database.service';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye } from 'lucide-react';
+import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink } from 'lucide-react';
 
 interface EnrollmentDashboardProps {
   selectedYear?: AcademicYear;
@@ -14,13 +15,46 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
   const { selectedYear: contextYear, isYearReadOnly } = useAcademicYear();
   const selectedYear = contextYear || propsSelectedYear;
 
+  const [activeIncidents, setActiveIncidents] = useState<IncidentSummary[]>([]);
+  const [incidentStats, setIncidentStats] = useState({ total: 0, pending: 0 });
+  const [isLoadingIncidents, setIsLoadingIncidents] = useState(true);
+
+  useEffect(() => {
+    const fetchIncidents = async () => {
+      try {
+        const [recent, stats] = await Promise.all([
+          incidentService.getRecent(),
+          incidentService.getStats()
+        ]);
+
+        if (recent && recent.length > 0) {
+          setActiveIncidents(recent);
+        } else {
+          setActiveIncidents(fallbackIncidents);
+        }
+
+        if (stats) {
+          setIncidentStats(stats);
+        }
+      } catch (error) {
+        console.error('Error loading incidents:', error);
+        setActiveIncidents(fallbackIncidents);
+      } finally {
+        setIsLoadingIncidents(false);
+      }
+    };
+
+    fetchIncidents();
+  }, []);
+
   const isReadOnly = selectedYear ? isYearReadOnly(selectedYear) : false;
   const isPlanning = selectedYear?.status === 'planificación';
   const isActive = selectedYear?.is_active;
 
   const totalStaff = mockProfiles.length;
-  const totalIncidents = mockIncidents.length;
-  const pendingIncidents = mockIncidents.filter(i => i.status === 'pending').length;
+  // Use real data from stats
+  const totalIncidents = incidentStats.total;
+  const pendingIncidents = incidentStats.pending;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -145,24 +179,72 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-50 flex items-center justify-between">
             <h4 className="font-bold text-slate-800 uppercase tracking-widest text-xs">Reportes de Convivencia</h4>
-            <button className="text-[9px] font-black text-[#57C5D5] uppercase hover:underline">Ver bitácora completa</button>
+            <a
+              href="https://sistema-de-incidencias.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[9px] font-black text-[#57C5D5] uppercase hover:underline"
+            >
+              Ver bitácora completa <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
           <div className="divide-y divide-slate-50">
-            {mockIncidents.map(inc => (
-              <div key={inc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${inc.status === 'pending' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                  <div>
-                    <p className="text-xs font-bold text-slate-700">{inc.correlative}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">{inc.type} • {inc.incident_date}</p>
+            {isLoadingIncidents ? (
+              <div className="p-8 text-center text-slate-400 text-xs">Cargando incidencias...</div>
+            ) : (
+              activeIncidents.map(inc => {
+                const getStatusStyle = (status: string) => {
+                  const normalized = status.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                  switch (normalized) {
+                    case 'registrada': return 'bg-slate-100 text-slate-600 border border-slate-200'; // Plomo
+                    case 'leida': return 'bg-blue-50 text-blue-600 border border-blue-100'; // Azul
+                    case 'resuelta':
+                    case 'resolved': return 'bg-emerald-50 text-emerald-600 border border-emerald-100'; // Verde
+                    case 'atencion': return 'bg-amber-50 text-amber-600 border border-amber-100'; // Naranja/Ambar
+                    case 'pending': return 'bg-amber-50 text-amber-600 border border-amber-100'; // Fallback for pending
+                    default: return 'bg-slate-50 text-slate-500 border border-slate-100';
+                  }
+                };
+
+                const formatDate = (dateString: string) => {
+                  try {
+                    const date = new Date(dateString);
+                    // Format: DD/MM/YYYY HH:MM
+                    return new Intl.DateTimeFormat('es-PE', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    }).format(date);
+                  } catch (e) {
+                    return dateString;
+                  }
+                };
+
+                const normalizedStatus = inc.status.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+                return (
+                  <div key={inc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${normalizedStatus === 'registrada' ? 'bg-slate-400' :
+                        normalizedStatus === 'leida' ? 'bg-blue-500' :
+                          normalizedStatus === 'resuelta' || normalizedStatus === 'resolved' ? 'bg-emerald-500' :
+                            normalizedStatus === 'atencion' || normalizedStatus === 'pending' ? 'bg-amber-500' : 'bg-slate-300'
+                        }`} />
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">{inc.correlative || 'S/N'}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{inc.type} • {formatDate(inc.incident_date)}</p>
+                      </div>
+                    </div>
+                    <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full ${getStatusStyle(inc.status)}`}>
+                      {inc.status}
+                    </span>
                   </div>
-                </div>
-                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${inc.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
-                  }`}>
-                  {inc.status}
-                </span>
-              </div>
-            ))}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

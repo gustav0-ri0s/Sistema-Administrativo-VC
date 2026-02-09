@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Profile, Student, AcademicYear, Classroom, CurricularArea } from '../types';
+import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSummary } from '../types';
 
 export const profileService = {
     async getAll() {
@@ -173,5 +173,58 @@ export const academicService = {
         console.log('DB Service: Bimestres created successfully');
 
         return yearData;
+
+    }
+};
+
+export const incidentService = {
+    async getRecent(limit: number = 5) {
+        console.log('DB Service: Fetching recent incidents...');
+        const { data, error } = await supabase
+            .from('incidents')
+            .select('id, correlative, type, status, incident_date')
+            .order('incident_date', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            console.error('DB Service: Error fetching incidents:', error);
+            // Return empty array instead of throwing to prevent crashing the dashboard
+            return [];
+        }
+        return data as IncidentSummary[];
+    },
+
+    async getStats() {
+        try {
+            // Get total count
+            const { count: total, error: totalError } = await supabase
+                .from('incidents')
+                .select('*', { count: 'exact', head: true });
+
+            if (totalError) throw totalError;
+
+            // Get pending count (not 'resuelta' or 'resolved')
+            // Using a raw filter because 'neq' might be case sensitive depending on collation, 
+            // but for now we assume standard behavior or we can fetch all status if needed.
+            // Simplified approach: fetch all statuses and count in JS if dataset is small, 
+            // OR use multiple queries. 
+            // Robust approach: 
+            const { data: allIncidents, error: listError } = await supabase
+                .from('incidents')
+                .select('status');
+
+            if (listError) throw listError;
+
+            const pending = allIncidents.filter(i => {
+                const s = i.status.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return s !== 'resuelta' && s !== 'resolved';
+            }).length;
+
+            return { total: total || 0, pending };
+
+        } catch (error) {
+            console.error('DB Service: Error fetching stats:', error);
+            return { total: 0, pending: 0 };
+        }
     }
 };

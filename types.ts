@@ -18,7 +18,7 @@ export enum AcademicStatus {
 
 export type YearStatus = 'abierto' | 'cerrado' | 'planificación';
 
-export type IncidentStatus = 'pending' | 'resolved' | 'investigating';
+export type IncidentStatus = 'pending' | 'resolved' | 'investigating' | 'registrada' | 'leida' | 'resuelta' | 'atencion';
 
 export interface Parent {
   id: string;
