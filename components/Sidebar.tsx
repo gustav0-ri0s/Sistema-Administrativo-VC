@@ -96,7 +96,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/50 mb-4">
             <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold shrink-0">
-              {currentUser.full_name.substring(0, 2).toUpperCase()}
+              {currentUser.full_name?.substring(0, 2).toUpperCase() || '??'}
             </div>
             <div className="overflow-hidden">
               <p className="text-xs font-semibold truncate">{currentUser.full_name}</p>

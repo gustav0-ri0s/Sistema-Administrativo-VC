@@ -20,15 +20,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError(null);
     console.log('Login: Iniciando autenticación para:', email);
     try {
-      const loginPromise = supabase.auth.signInWithPassword({
+      console.log('Login: Esperando respuesta de Supabase...');
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Login Timeout')), 10000));
-
-      console.log('Login: Esperando respuesta de Supabase...');
-      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
 
       console.log('Login: Respuesta recibida:', { data, error });
 

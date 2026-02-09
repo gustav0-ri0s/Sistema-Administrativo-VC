@@ -4,12 +4,17 @@ import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSumm
 
 export const profileService = {
     async getAll() {
+        console.log('profileService: getAll() called');
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .order('full_name', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error('profileService: getAll() error:', error);
+            throw error;
+        }
+        console.log('profileService: getAll() returned', data?.length, 'profiles');
         return data as Profile[];
     },
 
@@ -37,14 +42,59 @@ export const profileService = {
     },
 
     async getById(id: string) {
+        console.log('profileService: getById() called for ID:', id);
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', id)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('profileService: getById() error:', error);
+            throw error;
+        }
+        console.log('profileService: getById() found profile:', data?.full_name);
         return data as Profile;
+    },
+
+    async adminCreateUser(email: string, password: string, userData: Partial<Profile>) {
+        console.log('profileService: adminCreateUser() called for', email);
+        const { data, error } = await supabase.functions.invoke('admin-auth-handler', {
+            body: { action: 'create_user', email, password, userData }
+        });
+
+        if (error) {
+            console.error('profileService: adminCreateUser() error:', error);
+            throw error;
+        }
+        return data;
+    },
+
+    async adminUpdatePassword(profile_id: string, password: string) {
+        console.log('profileService: adminUpdatePassword() called for', profile_id);
+        const { data, error } = await supabase.functions.invoke('admin-auth-handler', {
+            body: { action: 'update_password', profile_id, password }
+        });
+
+        if (error) {
+            console.error('profileService: adminUpdatePassword() error:', error);
+            throw error;
+        }
+        return data;
+    },
+
+    async getActiveCount() {
+        console.log('profileService: getActiveCount() called');
+        const { count, error } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .eq('active', true);
+
+        if (error) {
+            console.error('profileService: getActiveCount() error:', error);
+            return 0;
+        }
+        return count || 0;
     }
 };
 
@@ -68,6 +118,20 @@ export const studentService = {
 
         if (error) throw error;
         return data as Student;
+    },
+
+    async getCountByYear(academicYearId: number) {
+        console.log('studentService: getCountByYear() called for year ID:', academicYearId);
+        const { count, error } = await supabase
+            .from('students')
+            .select('*', { count: 'exact', head: true })
+            .eq('academic_year_id', academicYearId);
+
+        if (error) {
+            console.error('studentService: getCountByYear() error:', error);
+            return 0;
+        }
+        return count || 0;
     }
 };
 

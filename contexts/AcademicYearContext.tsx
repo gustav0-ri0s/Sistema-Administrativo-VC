@@ -22,6 +22,7 @@ export const AcademicYearProvider: React.FC<AcademicYearProviderProps> = ({ chil
             console.log('AcademicYearContext: Fetched', years.length, 'years');
             setAcademicYears(years);
 
+            console.log('AcademicYearContext: Data ready, processing selection...');
             // Auto-select active year or first year
             if (!selectedYear || !years.find(y => y.id === selectedYear.id)) {
                 const activeYear = years.find(y => y.is_active);

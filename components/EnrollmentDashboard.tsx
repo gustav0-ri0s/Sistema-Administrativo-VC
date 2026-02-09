@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { AcademicYear, IncidentSummary } from '../types';
 import { mockClassrooms, mockProfiles, mockIncidents as fallbackIncidents } from '../services/mockData';
-import { incidentService } from '../services/database.service';
+import { academicService, incidentService, profileService, studentService } from '../services/database.service';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink } from 'lucide-react';
+import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink, Loader2 } from 'lucide-react';
 
 interface EnrollmentDashboardProps {
   selectedYear?: AcademicYear;
@@ -17,14 +17,18 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
 
   const [activeIncidents, setActiveIncidents] = useState<IncidentSummary[]>([]);
   const [incidentStats, setIncidentStats] = useState({ total: 0, pending: 0 });
-  const [isLoadingIncidents, setIsLoadingIncidents] = useState(true);
+  const [staffCount, setStaffCount] = useState(0);
+  const [studentCount, setStudentCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchIncidents = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const [recent, stats] = await Promise.all([
+        setIsLoading(true);
+        const [recent, stats, staff] = await Promise.all([
           incidentService.getRecent(),
-          incidentService.getStats()
+          incidentService.getStats(),
+          profileService.getActiveCount()
         ]);
 
         if (recent && recent.length > 0) {
@@ -33,19 +37,23 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           setActiveIncidents(fallbackIncidents);
         }
 
-        if (stats) {
-          setIncidentStats(stats);
+        if (stats) setIncidentStats(stats);
+        if (typeof staff === 'number') setStaffCount(staff);
+
+        if (selectedYear?.id) {
+          const students = await studentService.getCountByYear(selectedYear.id);
+          setStudentCount(students);
         }
       } catch (error) {
-        console.error('Error loading incidents:', error);
+        console.error('Error loading dashboard data:', error);
         setActiveIncidents(fallbackIncidents);
       } finally {
-        setIsLoadingIncidents(false);
+        setIsLoading(false);
       }
     };
 
-    fetchIncidents();
-  }, []);
+    fetchDashboardData();
+  }, [selectedYear?.id]);
 
   const isReadOnly = selectedYear ? isYearReadOnly(selectedYear) : false;
   const isPlanning = selectedYear?.status === 'planificación';
@@ -110,7 +118,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           </div>
           <div className="relative">
             <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Alumnado Total</p>
-            <h3 className="text-4xl font-black mt-1">{isReadOnly ? '245' : isPlanning ? '12' : '128'}</h3>
+            <h3 className="text-4xl font-black mt-1">{studentCount}</h3>
             <p className="text-[10px] mt-2 font-bold bg-white/20 w-fit px-2 py-0.5 rounded-full uppercase tracking-tighter">
               {isPlanning ? 'Proyecciones' : 'Matrículas Confirmadas'}
             </p>
@@ -124,7 +132,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-[#57C5D5] transition-colors">
           <div>
             <p className="text-[#718096] text-[10px] font-bold uppercase tracking-widest">Talento Humano</p>
-            <h3 className="text-4xl font-black mt-1 text-slate-800">{totalStaff}</h3>
+            <h3 className="text-4xl font-black mt-1 text-slate-800">{staffCount}</h3>
             <p className="text-[10px] mt-2 text-[#57C5D5] font-black uppercase tracking-tighter">Colaboradores Activos</p>
           </div>
           <div className="p-4 bg-[#57C5D5]/5 rounded-2xl text-[#57C5D5]">
@@ -189,8 +197,11 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
             </a>
           </div>
           <div className="divide-y divide-slate-50">
-            {isLoadingIncidents ? (
-              <div className="p-8 text-center text-slate-400 text-xs">Cargando incidencias...</div>
+            {isLoading ? (
+              <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-[#57C5D5]" />
+                Cargando incidencias...
+              </div>
             ) : (
               activeIncidents.map(inc => {
                 const getStatusStyle = (status: string) => {

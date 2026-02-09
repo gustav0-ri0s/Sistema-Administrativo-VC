@@ -11,6 +11,7 @@ import ClassroomManager from './components/ClassroomManager';
 import AreaCompetencyManager from './components/AreaCompetencyManager';
 import CourseAssignmentMatrix from './components/CourseAssignmentMatrix';
 import SettingsManager from './components/SettingsManager';
+import RestrictedAccess from './components/RestrictedAccess';
 import { UserRole, AcademicYear, BimestreConfig, Profile } from './types';
 import { academicService, profileService } from './services/database.service';
 import { supabase } from './services/supabase';
@@ -25,6 +26,13 @@ const createDefaultBimestres = (year: number): BimestreConfig[] => [
   { id: 4, name: 'IV Bimestre', start_date: `${year}-10-20`, end_date: `${year}-12-20`, is_locked: true },
 ];
 
+const ALLOWED_ROLES = [
+  UserRole.ADMIN,
+  UserRole.SUBDIRECTOR,
+  UserRole.SUPERVISOR,
+  UserRole.SECRETARIA
+];
+
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -36,10 +44,24 @@ const App: React.FC = () => {
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (isLoading) {
-        console.warn('App: Initialization timeout reached');
+        console.warn('App: Initialization timeout reached (15s)');
         setIsLoading(false);
       }
-    }, 10000);
+    }, 15000);
+
+    const fetchYears = async () => {
+      try {
+        console.log('App: Fetching academic years...');
+        const years = await academicService.getYears();
+        setAcademicYears(years);
+        if (years.length > 0) {
+          const activeYear = years.find(y => y.is_active);
+          if (activeYear) setViewingYear(activeYear.year);
+        }
+      } catch (e) {
+        console.error('App: Error fetching academic years:', e);
+      }
+    };
 
     const loadUserData = async (userId: string) => {
       try {
@@ -58,44 +80,38 @@ const App: React.FC = () => {
 
     const initializeAuth = async () => {
       try {
-        console.log('App: Initializing auth stage 1...');
-        const { data: { session }, error: sessionError } = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 5000))
-        ]) as any;
+        console.log('App: Initializing auth stage 1 (getSession)...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-          console.warn('App: Session error (non-critical):', sessionError);
+          console.warn('App: Session error:', sessionError);
         }
 
         if (session) {
-          console.log('App: Session found, loading profile...');
+          console.log('App: Session found for User ID:', session.user.id);
           await loadUserData(session.user.id);
+          await fetchYears();
         } else {
-          console.log('App: No session found');
+          console.log('App: No session found, redirecting to Login');
         }
 
-        console.log('App: Loading academic years...');
-        const years = await academicService.getYears();
-        console.log('App: Years loaded successfully:', years.length);
-        setAcademicYears(years);
-
-        if (years.length > 0) {
-          const active = years.find(y => y.is_active) || years[0];
-          setViewingYear(active.year);
-        }
+        console.log('App: Auth stage 1 complete');
       } catch (error) {
         console.error('CRITICAL: App failed to initialize:', error);
       } finally {
         setIsLoading(false);
+        console.log('App: isLoading set to false');
       }
     };
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('App: Auth state change event:', event);
       if (session) {
+        console.log('App: New session detected, loading data...');
         await loadUserData(session.user.id);
+        await fetchYears();
       } else {
         setIsAuthenticated(false);
         setCurrentUser(null);
@@ -145,6 +161,12 @@ const App: React.FC = () => {
 
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
+  }
+
+  // Check for restricted access
+  const isAccessRestricted = currentUser && !ALLOWED_ROLES.includes(currentUser.role);
+  if (isAccessRestricted && currentUser) {
+    return <RestrictedAccess role={currentUser.role} onLogout={handleLogout} />;
   }
 
   const renderContent = () => {

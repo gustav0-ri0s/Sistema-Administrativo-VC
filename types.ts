@@ -37,6 +37,11 @@ export interface Profile {
   role: UserRole;
   email: string;
   active: boolean;
+  gender?: string;
+  personal_email?: string;
+  phone?: string;
+  birth_date?: string;
+  password?: string;
 }
 
 // Added Assignment interface to fix missing member error
