@@ -51,13 +51,9 @@ const App: React.FC = () => {
 
     const fetchYears = async () => {
       try {
-        console.log('App: Fetching academic years...');
-        const years = await academicService.getYears();
-        setAcademicYears(years);
-        if (years.length > 0) {
-          const activeYear = years.find(y => y.is_active);
-          if (activeYear) setViewingYear(activeYear.year);
-        }
+        console.log('App: Fetching academic years via context if needed...');
+        // We rely on AcademicYearContext's refreshYears which is called on its mount.
+        // But we can call it here too if we want to be sure.
       } catch (e) {
         console.error('App: Error fetching academic years:', e);
       }
@@ -137,16 +133,21 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    console.log('App: Logout initiated...');
     try {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      console.log('App: Sign out successful');
       setIsAuthenticated(false);
       setCurrentUser(null);
       setActiveTab('dashboard');
     } catch (e) {
-      console.error('Error signing out:', e);
-      // Fallback manual reset
+      console.error('App: Error during logout:', e);
+      // Fallback: forcefully clear state and reload if necessary
       setIsAuthenticated(false);
       setCurrentUser(null);
+      window.location.reload(); // Hard reset as safety measure
     }
   };
 
@@ -224,22 +225,29 @@ const App: React.FC = () => {
             <div className="relative group">
               <button className="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:border-[#57C5D5] transition-all">
                 <Calendar className="w-4 h-4 text-[#57C5D5]" />
-                Viendo Ciclo: {viewingYear}
+                Viendo Ciclo: {selectedYearData?.year || viewingYear}
                 <ChevronDown className="w-4 h-4 text-slate-400 group-hover:rotate-180 transition-transform" />
               </button>
 
               <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-100 shadow-2xl rounded-2xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-50">
                 <p className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seleccionar Año</p>
-                {academicYears.sort((a, b) => b.year - a.year).map(y => (
-                  <button
-                    key={y.year}
-                    onClick={() => setViewingYear(y.year)}
-                    className={`w-full text-left px-4 py-2.5 text-sm font-semibold flex items-center justify-between hover:bg-slate-50 ${viewingYear === y.year ? 'text-[#57C5D5]' : 'text-slate-600'}`}
-                  >
-                    <span>Ciclo Académico {y.year}</span>
-                    {y.is_active && <span className="text-[8px] bg-[#57C5D5] text-white px-2 py-0.5 rounded-full uppercase">Activo</span>}
-                  </button>
-                ))}
+                {academicYears.length > 0 ? (
+                  academicYears.sort((a, b) => b.year - a.year).map(y => (
+                    <button
+                      key={y.year}
+                      onClick={() => {
+                        setViewingYear(y.year);
+                        // Optional: trigger context update if needed
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-semibold flex items-center justify-between hover:bg-slate-50 ${viewingYear === y.year ? 'text-[#57C5D5]' : 'text-slate-600'}`}
+                    >
+                      <span>Ciclo Académico {y.year}</span>
+                      {y.is_active && <span className="text-[8px] bg-[#57C5D5] text-white px-2 py-0.5 rounded-full uppercase">Activo</span>}
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-4 py-2 text-[10px] text-slate-400">Cargando años...</p>
+                )}
               </div>
             </div>
 

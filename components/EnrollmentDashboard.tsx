@@ -58,6 +58,16 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
     };
 
     fetchDashboardData();
+
+    // Safety timeout: force loading to stop after 10 seconds
+    const timeoutId = setTimeout(() => {
+      setIsLoading(prev => {
+        if (prev) console.warn('EnrollmentDashboard: Data fetch timeout reached');
+        return false;
+      });
+    }, 10000);
+
+    return () => clearTimeout(timeoutId);
   }, [selectedYear?.id]);
 
   const isReadOnly = selectedYear ? isYearReadOnly(selectedYear) : false;

@@ -42,7 +42,7 @@ const ProfileManagement: React.FC = () => {
     try {
       if (!supabase) throw new Error('Cliente de Supabase no inicializado');
 
-      console.log('ProfileManagement: Invoking Edge Function...');
+      console.log('ProfileManagement: Invoking Edge Function for DNI:', cleanDni);
 
       // Race the function call against the timeout
       const result = await Promise.race([
@@ -52,6 +52,8 @@ const ProfileManagement: React.FC = () => {
         timeoutPromise
       ]) as any;
 
+      if (!result) throw new Error('No se recibió respuesta del servidor.');
+
       const { data, error } = result;
 
       if (error) {
@@ -59,7 +61,7 @@ const ProfileManagement: React.FC = () => {
         throw error;
       }
 
-      console.log('ProfileManagement: DNI lookup result:', data);
+      console.log('ProfileManagement: DNI lookup successfully completed');
 
       if (data && data.normalized_full_name) {
         if (isEditing) {
@@ -73,9 +75,10 @@ const ProfileManagement: React.FC = () => {
       }
     } catch (error: any) {
       console.error('ProfileManagement: Error fetching DNI data:', error);
-      showToast('error', `No se pudo conectar con el servicio: ${error.message || 'Error de red'}`, 'Error de Conexión');
+      const errorMsg = error.message === 'Failed to fetch' ? 'Error de conexión con el servidor. Revisa tu internet.' : error.message;
+      showToast('error', `Error en consulta: ${errorMsg}`, 'Falla de Servicio');
     } finally {
-      console.log('ProfileManagement: DNI lookup process finished');
+      console.log('ProfileManagement: Resetting loadingDni state');
       setLoadingDni(false);
     }
   };
@@ -214,9 +217,13 @@ const ProfileManagement: React.FC = () => {
 
       setEditingProfile(null);
       showToast('success', 'Los cambios se han guardado correctamente.', 'Actualización Exitosa');
+
+      // Refresh local profile list
+      const freshProfiles = await profileService.getAll();
+      setProfiles(freshProfiles);
     } catch (error: any) {
       console.error('ProfileManagement: Error updating profile:', error);
-      showToast('error', `Error al actualizar personal: ${error.message || 'Error desconocido'}`, 'Error de Actualización');
+      showToast('error', `Error al actualizar: ${error.message || 'Error de red'}`, 'Error Crítico');
     } finally {
       setIsUpdating(false);
     }
