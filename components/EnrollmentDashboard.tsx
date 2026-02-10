@@ -22,6 +22,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
   const [staffCount, setStaffCount] = useState(0);
   const [studentCount, setStudentCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllClassrooms, setShowAllClassrooms] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -173,17 +174,34 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
             </div>
           </div>
           <div className="p-6 space-y-4">
-            {classrooms.map(room => (
-              <div key={room.id} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-slate-700">{room.name}</span>
-                  <span className="text-[10px] font-black text-slate-400">{room.enrolled}/{room.capacity}</span>
+            {classrooms
+              .filter(r => r.name || r.grade) // Filter out completely empty rows
+              .slice(0, showAllClassrooms ? undefined : 6)
+              .map(room => (
+                <div key={room.id} className="space-y-2 animate-in fade-in duration-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-700">
+                      {room.name || `${room.grade} ${room.section}`}
+                    </span>
+                    <span className="text-[10px] font-black text-slate-400">{room.enrolled}/{room.capacity}</span>
+                  </div>
+                  <div className="w-full bg-slate-50 h-2 rounded-full overflow-hidden border border-slate-100/50">
+                    <div
+                      className={`h-full transition-all duration-1000 ${room.enrolled >= room.capacity ? 'bg-amber-400' : 'bg-[#57C5D5]'}`}
+                      style={{ width: `${Math.min(100, (room.enrolled / room.capacity) * 100)}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-slate-50 h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#57C5D5] h-full" style={{ width: `${(room.enrolled / room.capacity) * 100}%` }}></div>
-                </div>
-              </div>
-            ))}
+              ))}
+
+            {classrooms.length > 6 && (
+              <button
+                onClick={() => setShowAllClassrooms(!showAllClassrooms)}
+                className="w-full py-3 mt-2 border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:border-[#57C5D5] hover:text-[#57C5D5] transition-all"
+              >
+                {showAllClassrooms ? 'Ver menos' : `Ver todo (${classrooms.length} aulas)`}
+              </button>
+            )}
           </div>
         </div>
 
