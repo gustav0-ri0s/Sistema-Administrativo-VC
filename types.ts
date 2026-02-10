@@ -26,6 +26,7 @@ export interface Parent {
   full_name: string;
   phone: string;
   occupation: string;
+  address?: string;
   is_guardian: boolean;
   relationship: 'Padre' | 'Madre' | 'Apoderado';
 }
@@ -41,6 +42,7 @@ export interface Profile {
   personal_email?: string;
   phone?: string;
   birth_date?: string;
+  address?: string;
   password?: string;
 }
 
@@ -55,11 +57,12 @@ export interface Assignment {
 export interface Classroom {
   id: string;
   name: string;
-  level: 'Inicial' | 'Primaria' | 'Secundaria';
+  level: 'inicial' | 'primaria' | 'secundaria';
   grade: string;
   section: string;
   capacity: number;
   enrolled: number;
+  active: boolean;
 }
 
 export interface Competency {

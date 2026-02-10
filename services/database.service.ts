@@ -292,3 +292,75 @@ export const incidentService = {
         }
     }
 };
+
+export const classroomService = {
+    async getAll() {
+        console.log('classroomService: getAll() called');
+        const { data, error } = await supabase
+            .from('classrooms')
+            .select('*')
+            .order('level', { ascending: true })
+            .order('grade', { ascending: true })
+            .order('section', { ascending: true });
+
+        if (error) {
+            console.error('classroomService: getAll() error:', error);
+            throw error;
+        }
+
+        // Since 'enrolled' is not in the DB yet, we'll default it to 0
+        // Eventually we should join with a student_enrollments table
+        return data.map(item => ({
+            ...item,
+            enrolled: 0,
+            active: item.active ?? true // Ensure active has a value
+        })) as Classroom[];
+    },
+
+    async create(classroom: Partial<Classroom>) {
+        const { enrolled, ...dbData } = classroom as any;
+        if (dbData.level) dbData.level = dbData.level.toLowerCase();
+
+        const { data, error } = await supabase
+            .from('classrooms')
+            .insert([dbData])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as Classroom;
+    },
+
+    async update(id: string | number, updates: Partial<Classroom>) {
+        console.log('classroomService: update() called', { id, updates });
+        const { enrolled, ...dbUpdates } = updates as any; // Strip non-DB fields
+
+        // Ensure level is lowercase if present
+        if (dbUpdates.level) {
+            dbUpdates.level = dbUpdates.level.toLowerCase();
+        }
+
+        const { data, error } = await supabase
+            .from('classrooms')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('classroomService: update() error:', error);
+            throw error;
+        }
+        return data as Classroom;
+    },
+
+    async delete(id: string) {
+        const { error } = await supabase
+            .from('classrooms')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    }
+};
+

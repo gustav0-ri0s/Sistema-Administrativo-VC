@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Student, AcademicStatus } from '../types';
 import { studentService } from '../services/database.service';
+import { useToast } from '../contexts/ToastContext';
 import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2 } from 'lucide-react';
 
 const StudentManagement: React.FC = () => {
@@ -10,6 +11,7 @@ const StudentManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const { showToast } = useToast();
 
   React.useEffect(() => {
     const fetchStudents = async () => {
@@ -69,7 +71,7 @@ const StudentManagement: React.FC = () => {
 
   const handleSave = async () => {
     if (!formData.dni || !formData.first_name || !formData.last_name) {
-      alert("Por favor complete los campos obligatorios.");
+      showToast('warning', 'Por favor complete todos los campos marcados como obligatorios.', 'Datos Incompletos');
       return;
     }
 
@@ -91,9 +93,10 @@ const StudentManagement: React.FC = () => {
 
       setShowForm(false);
       setEditingStudent(null);
-    } catch (error) {
+      showToast('success', 'Información del estudiante guardada con éxito.', '¡Éxito!');
+    } catch (error: any) {
       console.error('Error saving student:', error);
-      alert('Error al guardar el estudiante');
+      showToast('error', `No se pudo guardar la información: ${error.message || 'Error desconocido'}`, 'Error al Guardar');
     }
   };
 

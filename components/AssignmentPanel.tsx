@@ -1,23 +1,23 @@
 
 import React, { useState } from 'react';
 import { Profile, Classroom, Assignment, UserRole } from '../types';
-import { mockClassrooms } from '../services/mockData';
 import { Check, ShieldCheck, Info } from 'lucide-react';
 
 interface AssignmentPanelProps {
   profile: Profile;
+  classrooms: Classroom[];
   onSave: (assignments: Assignment[]) => void;
   initialAssignments: Assignment[];
 }
 
-const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, onSave, initialAssignments }) => {
+const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, classrooms, onSave, initialAssignments }) => {
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
 
   const isSupervisoryRole = profile.role === UserRole.SUBDIRECTOR || profile.role === UserRole.ADMIN;
 
   const toggleAssignment = (classroomId: string, field: 'canAttendance' | 'canGrades') => {
     const existingIndex = assignments.findIndex(a => a.classroomId === classroomId);
-    
+
     if (existingIndex > -1) {
       const newAssignments = [...assignments];
       newAssignments[existingIndex] = {
@@ -31,11 +31,11 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, onSave, init
     } else {
       setAssignments([
         ...assignments,
-        { 
-          profileId: profile.id, 
-          classroomId, 
-          canAttendance: field === 'canAttendance', 
-          canGrades: field === 'canGrades' 
+        {
+          profileId: profile.id,
+          classroomId,
+          canAttendance: field === 'canAttendance',
+          canGrades: field === 'canGrades'
         }
       ]);
     }
@@ -66,7 +66,7 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, onSave, init
           <h3 className="text-lg font-bold text-slate-900">Asignación de Salones</h3>
           <p className="text-sm text-slate-500">Define las responsabilidades de {profile.full_name}.</p>
         </div>
-        <button 
+        <button
           onClick={() => onSave(assignments)}
           className="px-6 py-2 bg-[#57C5D5] text-white rounded-xl text-sm font-bold hover:bg-[#46b3c2] transition-all shadow-lg shadow-[#57C5D5]/20"
         >
@@ -75,25 +75,24 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, onSave, init
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {mockClassrooms.map((room) => {
+        {classrooms.map((room) => {
           const current = getAssignment(room.id);
           const hasSome = current.canAttendance || current.canGrades;
           return (
-            <div key={room.id} className={`p-4 rounded-2xl border-2 transition-all ${
-              hasSome ? 'border-[#57C5D5] bg-white ring-4 ring-[#57C5D5]/5' : 'border-slate-100 bg-slate-50 opacity-80'
-            }`}>
+            <div key={room.id} className={`p-4 rounded-2xl border-2 transition-all ${hasSome ? 'border-[#57C5D5] bg-white ring-4 ring-[#57C5D5]/5' : 'border-slate-100 bg-slate-50 opacity-80'
+              }`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="font-bold text-slate-900 text-sm">{room.name}</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{room.level}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{room.level} - {room.grade} {room.section}</p>
                 </div>
                 {hasSome && <Check className="w-5 h-5 text-[#57C5D5]" />}
               </div>
-              
+
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={current.canAttendance}
                     onChange={() => toggleAssignment(room.id, 'canAttendance')}
                     className="w-4 h-4 rounded text-[#57C5D5] border-slate-300 focus:ring-[#57C5D5]"
@@ -101,8 +100,8 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, onSave, init
                   <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">Asistencia</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={current.canGrades}
                     onChange={() => toggleAssignment(room.id, 'canGrades')}
                     className="w-4 h-4 rounded text-[#57C5D5] border-slate-300 focus:ring-[#57C5D5]"
@@ -124,5 +123,6 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, onSave, init
     </div>
   );
 };
+
 
 export default AssignmentPanel;

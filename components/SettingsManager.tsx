@@ -1,16 +1,18 @@
 
 import React, { useState } from 'react';
-import { 
-  Building2, Award, ClipboardCheck, HeartHandshake, Timer, Save, 
-  Upload, Plus, Trash2, Palette, Info, Check, X, Heart, 
+import {
+  Building2, Award, ClipboardCheck, HeartHandshake, Timer, Save,
+  Upload, Plus, Trash2, Palette, Info, Check, X, Heart, Edit3,
   Settings2, LayoutGrid, Terminal, Share2, MousePointer2, UserCheck
 } from 'lucide-react';
 import { GradeScale, InstitutionalSettings } from '../types';
+import { useToast } from '../contexts/ToastContext';
 
 const SettingsManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'info' | 'scales' | 'transversal' | 'parents' | 'attendance'>('info');
   const [showCommitmentModal, setShowCommitmentModal] = useState(false);
   const [newCommitmentText, setNewCommitmentText] = useState('');
+  const { showToast } = useToast();
 
   const [instInfo] = useState<InstitutionalSettings>({
     name: 'I.E.P. Valores y Ciencias',
@@ -30,19 +32,19 @@ const SettingsManager: React.FC = () => {
 
   // Datos para Criterios Finales (Transversales y Comportamiento)
   const [transversalCompetencies, setTransversalCompetencies] = useState([
-    { 
-      id: 'ct1', 
-      name: 'Se desenvuelve en entornos virtuales generados por las TIC', 
+    {
+      id: 'ct1',
+      name: 'Se desenvuelve en entornos virtuales generados por las TIC',
       code: 'TIC',
       isActive: true,
-      description: 'Interactúa en entornos virtuales, personaliza perfiles y gestiona información.' 
+      description: 'Interactúa en entornos virtuales, personaliza perfiles y gestiona información.'
     },
-    { 
-      id: 'ct2', 
-      name: 'Gestiona su aprendizaje de manera autónoma', 
+    {
+      id: 'ct2',
+      name: 'Gestiona su aprendizaje de manera autónoma',
       code: 'AUT',
       isActive: true,
-      description: 'Define metas de aprendizaje, organiza acciones y monitorea su desempeño.' 
+      description: 'Define metas de aprendizaje, organiza acciones y monitorea su desempeño.'
     }
   ]);
 
@@ -54,9 +56,9 @@ const SettingsManager: React.FC = () => {
   ]);
 
   const [commitments, setCommitments] = useState([
-    'Acompaña en el aprendizaje diario', 
-    'Cumple estrictamente con el uniforme institucional', 
-    'Envía loncheras nutritivas siguiendo el cronograma', 
+    'Acompaña en el aprendizaje diario',
+    'Cumple estrictamente con el uniforme institucional',
+    'Envía loncheras nutritivas siguiendo el cronograma',
     'Asiste puntualmente a todas las reuniones de aula',
     'Fomenta la práctica de valores en el hogar',
     'Revisa diariamente el cuaderno de control/agenda'
@@ -64,7 +66,7 @@ const SettingsManager: React.FC = () => {
 
   const handleAddCommitment = () => {
     if (newCommitmentText.trim().length < 5) {
-      alert("Por favor, describa el compromiso con más detalle.");
+      showToast('warning', 'Por favor, describa el compromiso con más detalle (mínimo 5 caracteres).', 'Descripción Breve');
       return;
     }
     setCommitments([...commitments, newCommitmentText.trim()]);
@@ -75,11 +77,10 @@ const SettingsManager: React.FC = () => {
   const TabButton = ({ id, label, icon: Icon }: { id: any, label: string, icon: any }) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all font-bold text-xs uppercase tracking-widest whitespace-nowrap ${
-        activeTab === id 
-          ? 'border-[#57C5D5] text-[#57C5D5] bg-[#57C5D5]/5' 
-          : 'border-transparent text-slate-400 hover:text-slate-600'
-      }`}
+      className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all font-bold text-xs uppercase tracking-widest whitespace-nowrap ${activeTab === id
+        ? 'border-[#57C5D5] text-[#57C5D5] bg-[#57C5D5]/5'
+        : 'border-transparent text-slate-400 hover:text-slate-600'
+        }`}
     >
       <Icon className="w-4 h-4" />
       {label}
@@ -133,7 +134,7 @@ const SettingsManager: React.FC = () => {
               <div className="space-y-8">
                 <div className="p-8 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center text-center group hover:border-[#57C5D5] transition-all">
                   <div className="w-24 h-24 bg-white rounded-3xl shadow-sm flex items-center justify-center mb-4 overflow-hidden border border-slate-100 group-hover:scale-105 transition-transform">
-                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">LOGO IEP</span>
+                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">LOGO IEP</span>
                   </div>
                   <button className="flex items-center gap-2 text-[10px] font-black text-[#57C5D5] hover:underline uppercase tracking-widest">
                     <Upload className="w-3 h-3" /> Cargar Logo
@@ -155,16 +156,16 @@ const SettingsManager: React.FC = () => {
                 {scales.map((scale, idx) => (
                   <div key={scale.id} className="p-5 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center justify-between group transition-all hover:border-[#57C5D5] hover:shadow-lg">
                     <div className="flex items-center gap-4">
-                      <div 
+                      <div
                         className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white shadow-lg"
                         style={{ backgroundColor: scale.color }}
                       >
                         {scale.label}
                       </div>
                       <div>
-                        <input 
-                          type="text" 
-                          value={scale.description} 
+                        <input
+                          type="text"
+                          value={scale.description}
                           onChange={(e) => {
                             const newScales = [...scales];
                             newScales[idx].description = e.target.value;
@@ -178,8 +179,8 @@ const SettingsManager: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <input 
-                      type="color" 
+                    <input
+                      type="color"
                       value={scale.color}
                       onChange={(e) => {
                         const newScales = [...scales];
@@ -209,24 +210,24 @@ const SettingsManager: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {transversalCompetencies.map((comp) => (
                     <div key={comp.id} className="p-6 bg-slate-50/50 border border-slate-100 rounded-3xl hover:border-[#57C5D5] transition-all group relative overflow-hidden">
-                       <div className="absolute top-0 right-0 p-3">
-                          <span className="text-[8px] font-black bg-[#57C5D5] text-white px-2 py-0.5 rounded-full uppercase">{comp.code}</span>
-                       </div>
-                       <div className="flex items-start gap-4">
-                          <div className="p-3 bg-white rounded-2xl shadow-sm text-[#57C5D5] group-hover:scale-110 transition-transform">
-                             {comp.code === 'TIC' ? <MousePointer2 className="w-5 h-5" /> : <Settings2 className="w-5 h-5" />}
-                          </div>
-                          <div>
-                             <h4 className="text-xs font-black text-slate-800 leading-tight pr-8">{comp.name}</h4>
-                             <p className="text-[10px] text-slate-500 font-bold mt-2 leading-relaxed">{comp.description}</p>
-                          </div>
-                       </div>
-                       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
-                             <Check className="w-3 h-3" /> Habilitado en Libreta
-                          </span>
-                          <button className="text-[9px] font-black text-slate-400 hover:text-[#57C5D5] uppercase tracking-widest">Editar Config.</button>
-                       </div>
+                      <div className="absolute top-0 right-0 p-3">
+                        <span className="text-[8px] font-black bg-[#57C5D5] text-white px-2 py-0.5 rounded-full uppercase">{comp.code}</span>
+                      </div>
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-white rounded-2xl shadow-sm text-[#57C5D5] group-hover:scale-110 transition-transform">
+                          {comp.code === 'TIC' ? <MousePointer2 className="w-5 h-5" /> : <Settings2 className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-800 leading-tight pr-8">{comp.name}</h4>
+                          <p className="text-[10px] text-slate-500 font-bold mt-2 leading-relaxed">{comp.description}</p>
+                        </div>
+                      </div>
+                      <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Habilitado en Libreta
+                        </span>
+                        <button className="text-[9px] font-black text-slate-400 hover:text-[#57C5D5] uppercase tracking-widest">Editar Config.</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -261,17 +262,16 @@ const SettingsManager: React.FC = () => {
                             <span className="text-xs font-bold text-slate-700 uppercase">{crit.name}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
-                              crit.weight === 'Crítico' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-500'
-                            }`}>
+                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${crit.weight === 'Crítico' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-500'
+                              }`}>
                               {crit.weight}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right">
-                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button className="p-2 text-slate-300 hover:text-[#57C5D5]"><Edit3 className="w-3.5 h-3.5" /></button>
-                                <button className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
-                             </div>
+                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button className="p-2 text-slate-300 hover:text-[#57C5D5]"><Edit3 className="w-3.5 h-3.5" /></button>
+                              <button className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -291,7 +291,7 @@ const SettingsManager: React.FC = () => {
                   </h4>
                   <p className="text-[10px] text-slate-500 font-bold mt-1">Estos criterios se evalúan bimestralmente en la libreta.</p>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowCommitmentModal(true)}
                   className="flex items-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#46b3c2] shadow-lg shadow-[#57C5D5]/10"
                 >
@@ -304,8 +304,8 @@ const SettingsManager: React.FC = () => {
                     <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:text-[#57C5D5] group-hover:bg-[#57C5D5]/5 transition-all">
                       <Check className="w-4 h-4" />
                     </div>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={item}
                       onChange={(e) => {
                         const newC = [...commitments];
@@ -314,7 +314,7 @@ const SettingsManager: React.FC = () => {
                       }}
                       className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-slate-600"
                     />
-                    <button 
+                    <button
                       onClick={() => setCommitments(commitments.filter((_, i) => i !== idx))}
                       className="p-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
                     >
@@ -328,32 +328,32 @@ const SettingsManager: React.FC = () => {
 
           {activeTab === 'attendance' && (
             <div className="max-w-xl mx-auto space-y-12 animate-in zoom-in-95 duration-300 py-8">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
-                  <div className="space-y-6">
-                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                       <Timer className="w-4 h-4 text-[#57C5D5]" /> Control de Puntualidad
-                    </h5>
-                    <div className="flex items-end gap-3">
-                       <input type="number" defaultValue={15} className="w-24 px-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-3xl text-3xl font-black text-[#57C5D5] outline-none focus:border-[#57C5D5] text-center" />
-                       <span className="text-xs font-black text-slate-400 pb-5 uppercase tracking-widest">MINUTOS</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-bold leading-relaxed uppercase">
-                      Tolerancia permitida antes de registrarse como tardanza automática en el parte diario.
-                    </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
+                <div className="space-y-6">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Timer className="w-4 h-4 text-[#57C5D5]" /> Control de Puntualidad
+                  </h5>
+                  <div className="flex items-end gap-3">
+                    <input type="number" defaultValue={15} className="w-24 px-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-3xl text-3xl font-black text-[#57C5D5] outline-none focus:border-[#57C5D5] text-center" />
+                    <span className="text-xs font-black text-slate-400 pb-5 uppercase tracking-widest">MINUTOS</span>
                   </div>
+                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed uppercase">
+                    Tolerancia permitida antes de registrarse como tardanza automática en el parte diario.
+                  </p>
+                </div>
 
-                  <div className="space-y-6">
-                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visualización de Estados</h5>
-                    <div className="space-y-3">
-                       {['Asistencia', 'Tardanza', 'Inasistencia'].map(status => (
-                         <div key={status} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                            <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{status}</span>
-                            <div className={`w-4 h-4 rounded-full shadow-inner ${status === 'Asistencia' ? 'bg-emerald-500 shadow-emerald-500/50' : status === 'Tardanza' ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} />
-                         </div>
-                       ))}
-                    </div>
+                <div className="space-y-6">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visualización de Estados</h5>
+                  <div className="space-y-3">
+                    {['Asistencia', 'Tardanza', 'Inasistencia'].map(status => (
+                      <div key={status} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                        <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{status}</span>
+                        <div className={`w-4 h-4 rounded-full shadow-inner ${status === 'Asistencia' ? 'bg-emerald-500 shadow-emerald-500/50' : status === 'Tardanza' ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} />
+                      </div>
+                    ))}
                   </div>
-               </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -373,19 +373,19 @@ const SettingsManager: React.FC = () => {
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Criterio de Evaluación Bimestral</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowCommitmentModal(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
             </header>
-            
+
             <div className="p-8 space-y-4">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
                 Descripción del Criterio
               </label>
-              <textarea 
+              <textarea
                 autoFocus
                 value={newCommitmentText}
                 onChange={(e) => setNewCommitmentText(e.target.value)}
@@ -401,13 +401,13 @@ const SettingsManager: React.FC = () => {
             </div>
 
             <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setShowCommitmentModal(false)}
                 className="px-6 py-2.5 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 onClick={handleAddCommitment}
                 className="px-10 py-3 bg-[#57C5D5] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all active:scale-95"
               >
@@ -417,20 +417,15 @@ const SettingsManager: React.FC = () => {
           </div>
         </div>
       )}
-      
+
       <div className="flex items-center gap-3 bg-slate-900 text-white p-6 rounded-3xl shadow-2xl">
-         <Info className="w-8 h-8 text-[#57C5D5] shrink-0" />
-         <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed">
-            Nota: Al guardar los cambios, se actualizarán automáticamente las cabeceras de todas las libretas y reportes del ciclo operativo actual.
-         </p>
+        <Info className="w-8 h-8 text-[#57C5D5] shrink-0" />
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed">
+          Nota: Al guardar los cambios, se actualizarán automáticamente las cabeceras de todas las libretas y reportes del ciclo operativo actual.
+        </p>
       </div>
     </div>
   );
 };
-
-// Internal Edit3 icon mock since it was missing in components but used in some files
-const Edit3 = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-);
 
 export default SettingsManager;

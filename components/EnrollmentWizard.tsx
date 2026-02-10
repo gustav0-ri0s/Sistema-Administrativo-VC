@@ -1,8 +1,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Student, Parent, AcademicYear } from '../types';
-import { mockClassrooms, mockStudents } from '../services/mockData';
+import { Student, Parent, AcademicYear, Classroom } from '../types';
+import { mockStudents } from '../services/mockData';
+import { classroomService } from '../services/database.service';
+
 import { useAcademicYear } from '../contexts/AcademicYearContext';
+import { useToast } from '../contexts/ToastContext';
+import { supabase } from '../services/supabase';
 import {
   User,
   Heart,
@@ -17,8 +21,10 @@ import {
   UserCircle,
   AlertCircle,
   Edit,
-  // Added missing Info icon import
-  Info
+  Info,
+  Loader2,
+  MapPin,
+  Copy
 } from 'lucide-react';
 
 interface EnrollmentWizardProps {
@@ -37,6 +43,9 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [isLoadingClassrooms, setIsLoadingClassrooms] = useState(false);
+  const { showToast } = useToast();
 
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
@@ -47,14 +56,30 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
     }
   }, [openYears, selectedYear]);
 
+  useEffect(() => {
+    const fetchClassrooms = async () => {
+      try {
+        setIsLoadingClassrooms(true);
+        const data = await classroomService.getAll();
+        setClassrooms(data);
+      } catch (error) {
+        console.error('Error fetching classrooms:', error);
+      } finally {
+        setIsLoadingClassrooms(false);
+      }
+    };
+    fetchClassrooms();
+  }, []);
+
+
   const [formData, setFormData] = useState<Partial<Student>>({
     dni: '',
     first_name: '',
     last_name: '',
     birth_date: '',
     parents: [
-      { id: 'p1', dni: '', full_name: '', phone: '', occupation: '', relationship: 'Padre', is_guardian: false },
-      { id: 'p2', dni: '', full_name: '', phone: '', occupation: '', relationship: 'Madre', is_guardian: true }
+      { id: 'p1', dni: '', full_name: '', phone: '', occupation: '', address: '', relationship: 'Padre', is_guardian: false },
+      { id: 'p2', dni: '', full_name: '', phone: '', occupation: '', address: '', relationship: 'Madre', is_guardian: true }
     ]
   });
 
@@ -80,6 +105,45 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
     setIsEditMode(true);
     setIsSearchModalOpen(false);
     setSearchQuery('');
+  };
+
+  const [loadingDni, setLoadingDni] = useState<string | null>(null);
+
+  const handleDniLookup = async (index: number, dni: string) => {
+    if (dni.length !== 8) {
+      showToast('warning', 'El DNI debe tener 8 dígitos para realizar la consulta.', 'DNI Inválido');
+      return;
+    }
+
+    setLoadingDni(`${index}`);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-reniec-data', {
+        body: { dni }
+      });
+
+      if (error) throw error;
+
+      if (data && data.normalized_full_name) {
+        updateParent(index, 'full_name', data.normalized_full_name);
+        showToast('success', 'Datos de RENIEC cargados.', 'Éxito');
+      } else {
+        showToast('error', 'No se encontraron datos para este DNI.', 'Sin Resultados');
+      }
+    } catch (error: any) {
+      console.error('Error fetching DNI data:', error);
+      showToast('error', `Error al consultar RENIEC: ${error.message || 'Error desconocido'}`, 'Error de Consulta');
+    } finally {
+      setLoadingDni(null);
+    }
+  };
+
+  const handleCopyAddress = (targetIndex: number) => {
+    const sourceIndex = targetIndex === 0 ? 1 : 0;
+    const sourceAddress = formData.parents?.[sourceIndex]?.address;
+
+    if (sourceAddress) {
+      updateParent(targetIndex, 'address', sourceAddress);
+    }
   };
 
   const nextStep = () => setStep(s => Math.min(s + 1, 3));
@@ -119,8 +183,8 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
                 key={y.year}
                 onClick={() => setSelectedYear(y.year)}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition-all border-2 ${selectedYear === y.year
-                    ? 'bg-[#57C5D5] text-white border-[#57C5D5] shadow-lg shadow-[#57C5D5]/20'
-                    : 'bg-white text-slate-400 border-slate-100 hover:border-[#57C5D5]/30'
+                  ? 'bg-[#57C5D5] text-white border-[#57C5D5] shadow-lg shadow-[#57C5D5]/20'
+                  : 'bg-white text-slate-400 border-slate-100 hover:border-[#57C5D5]/30'
                   }`}
               >
                 {selectedYear === y.year && <CheckCircle className="w-4 h-4" />}
@@ -252,10 +316,81 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
                       </button>
                     </div>
                     <div className="space-y-4">
-                      <input type="text" placeholder="Nombres Completos" className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#57C5D5]" />
-                      <div className="grid grid-cols-2 gap-4">
-                        <input type="text" placeholder="DNI" className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#57C5D5]" />
-                        <input type="text" placeholder="Celular" className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#57C5D5]" />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DNI</label>
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              placeholder="8 dígitos"
+                              value={parent.dni}
+                              onChange={(e) => updateParent(idx, 'dni', e.target.value)}
+                              className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5] transition-all"
+                            />
+                            <button
+                              type="button"
+                              disabled={loadingDni === `${idx}`}
+                              onClick={() => handleDniLookup(idx, parent.dni)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-[#57C5D5] text-white rounded-lg shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-colors disabled:opacity-50"
+                            >
+                              {loadingDni === `${idx}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Celular</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. 999 000 000"
+                            value={parent.phone}
+                            onChange={(e) => updateParent(idx, 'phone', e.target.value)}
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombres Completos</label>
+                        <input
+                          type="text"
+                          placeholder="Nombre cargado de RENIEC"
+                          value={parent.full_name}
+                          onChange={(e) => updateParent(idx, 'full_name', e.target.value)}
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex justify-between items-center">
+                          <span>Dirección Domiciliaria</span>
+                          {((idx === 0 && formData.parents?.[1]?.address) || (idx === 1 && formData.parents?.[0]?.address)) && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyAddress(idx)}
+                              className="flex items-center gap-1 text-[#57C5D5] hover:text-[#46b3c2] transition-colors lowercase font-bold tracking-tight"
+                            >
+                              <Copy className="w-3 h-3" /> Misma dirección
+                            </button>
+                          )}
+                        </label>
+                        <div className="relative">
+                          <MapPin className="absolute left-4 top-3 w-4 h-4 text-slate-300" />
+                          <input
+                            type="text"
+                            placeholder="Av. Principal 123, Distrito"
+                            value={parent.address}
+                            onChange={(e) => updateParent(idx, 'address', e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ocupación / Profesión</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Ingeniero de Sistemas"
+                          value={parent.occupation}
+                          onChange={(e) => updateParent(idx, 'occupation', e.target.value)}
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                        />
                       </div>
                     </div>
                   </div>
@@ -274,7 +409,7 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Aula y Sección</label>
                 <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none">
                   <option>Seleccione un aula con vacantes...</option>
-                  {mockClassrooms.map(c => <option key={c.id} value={c.id}>{c.name} ({c.enrolled}/{c.capacity})</option>)}
+                  {classrooms.map(c => <option key={c.id} value={c.id}>{c.name} ({c.enrolled}/{c.capacity})</option>)}
                 </select>
               </div>
             </div>

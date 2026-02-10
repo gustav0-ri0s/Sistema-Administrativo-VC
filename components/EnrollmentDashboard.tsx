@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { AcademicYear, IncidentSummary } from '../types';
-import { mockClassrooms, mockProfiles, mockIncidents as fallbackIncidents } from '../services/mockData';
-import { academicService, incidentService, profileService, studentService } from '../services/database.service';
+import { AcademicYear, IncidentSummary, Classroom } from '../types';
+import { mockProfiles, mockIncidents as fallbackIncidents } from '../services/mockData';
+import { academicService, incidentService, profileService, studentService, classroomService } from '../services/database.service';
+
 import { useAcademicYear } from '../contexts/AcademicYearContext';
 import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink, Loader2 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
 
   const [activeIncidents, setActiveIncidents] = useState<IncidentSummary[]>([]);
   const [incidentStats, setIncidentStats] = useState({ total: 0, pending: 0 });
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [staffCount, setStaffCount] = useState(0);
   const [studentCount, setStudentCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,10 +27,11 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
-        const [recent, stats, staff] = await Promise.all([
+        const [recent, stats, staff, classroomsData] = await Promise.all([
           incidentService.getRecent(),
           incidentService.getStats(),
-          profileService.getActiveCount()
+          profileService.getActiveCount(),
+          classroomService.getAll()
         ]);
 
         if (recent && recent.length > 0) {
@@ -39,6 +42,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
 
         if (stats) setIncidentStats(stats);
         if (typeof staff === 'number') setStaffCount(staff);
+        if (classroomsData) setClassrooms(classroomsData);
 
         if (selectedYear?.id) {
           const students = await studentService.getCountByYear(selectedYear.id);
@@ -59,10 +63,10 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
   const isPlanning = selectedYear?.status === 'planificación';
   const isActive = selectedYear?.is_active;
 
-  const totalStaff = mockProfiles.length;
   // Use real data from stats
   const totalIncidents = incidentStats.total;
   const pendingIncidents = incidentStats.pending;
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -169,7 +173,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
             </div>
           </div>
           <div className="p-6 space-y-4">
-            {mockClassrooms.map(room => (
+            {classrooms.map(room => (
               <div key={room.id} className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-slate-700">{room.name}</span>
