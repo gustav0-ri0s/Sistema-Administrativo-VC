@@ -142,6 +142,7 @@ export interface InstitutionalSettings {
   city: string;
   phones: string;
   directorName: string;
+  attendanceTolerance: number;
 }
 
 // Academic Year Context Types

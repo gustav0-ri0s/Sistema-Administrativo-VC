@@ -1,17 +1,35 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CurricularArea, Competency } from '../types';
-import { mockCurricularAreas } from '../services/mockData';
+import { curricularAreaService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
-import { Layers, Plus, Search, Trash2, Edit3, ChevronRight, Info, Copy, CheckCircle2, X } from 'lucide-react';
+import { Layers, Plus, Search, Trash2, Edit3, ChevronRight, Info, Copy, CheckCircle2, X, Loader2 } from 'lucide-react';
 
 const AreaCompetencyManager: React.FC = () => {
-  const [areas, setAreas] = useState<CurricularArea[]>(mockCurricularAreas);
+  const [areas, setAreas] = useState<CurricularArea[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedArea, setSelectedArea] = useState<CurricularArea | null>(null);
   const [showAreaForm, setShowAreaForm] = useState(false);
   const [showCompetencyForm, setShowCompetencyForm] = useState(false);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    loadAreas();
+  }, []);
+
+  const loadAreas = async () => {
+    try {
+      setLoading(true);
+      const data = await curricularAreaService.getAll();
+      setAreas(data);
+    } catch (error) {
+      console.error('Error loading areas:', error);
+      showToast('error', 'No se pudieron cargar las áreas curriculares.', 'Error de Conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredAreas = areas.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -22,26 +40,45 @@ const AreaCompetencyManager: React.FC = () => {
     }
   };
 
-  const toggleCompetencyStatus = (areaId: string, competencyId: string) => {
-    setAreas(areas.map(a => {
+  const toggleCompetencyStatus = async (areaId: string, competencyId: string) => {
+    const area = areas.find(a => a.id === areaId);
+    const competency = area?.competencies.find(c => c.id === competencyId);
+
+    if (!competency) return;
+
+    const newStatus = !competency.isEvaluated;
+
+    // Optimistic UI update
+    const updatedAreas = areas.map(a => {
       if (a.id === areaId) {
         return {
           ...a,
           competencies: a.competencies.map(c =>
-            c.id === competencyId ? { ...c, isEvaluated: !c.isEvaluated } : c
+            c.id === competencyId ? { ...c, isEvaluated: newStatus } : c
           )
         };
       }
       return a;
-    }));
-    // Actualizar también el área seleccionada en el panel detalle si existe
+    });
+
+    setAreas(updatedAreas);
     if (selectedArea && selectedArea.id === areaId) {
       setSelectedArea({
         ...selectedArea,
         competencies: selectedArea.competencies.map(c =>
-          c.id === competencyId ? { ...c, isEvaluated: !c.isEvaluated } : c
+          c.id === competencyId ? { ...c, isEvaluated: newStatus } : c
         )
       });
+    }
+
+    try {
+      await curricularAreaService.updateCompetencyStatus(competencyId, newStatus);
+      showToast('success', `Estado de competencia actualizado.`, 'Cambio Guardado');
+    } catch (error) {
+      console.error('Error updating competency status:', error);
+      showToast('error', 'No se pudo actualizar el estado en el servidor.', 'Error');
+      // Revert on error
+      loadAreas();
     }
   };
 
@@ -85,13 +122,18 @@ const AreaCompetencyManager: React.FC = () => {
           </div>
 
           <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 scrollbar-hide">
-            {filteredAreas.map(area => (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-20 text-slate-400">
+                <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                <p className="text-xs font-bold uppercase tracking-widest">Cargando Estructura...</p>
+              </div>
+            ) : filteredAreas.map(area => (
               <button
                 key={area.id}
                 onClick={() => setSelectedArea(area)}
                 className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${selectedArea?.id === area.id
-                    ? 'border-[#57C5D5] bg-white ring-4 ring-[#57C5D5]/5 shadow-md'
-                    : 'border-white bg-white hover:border-slate-100 shadow-sm'
+                  ? 'border-[#57C5D5] bg-white ring-4 ring-[#57C5D5]/5 shadow-md'
+                  : 'border-white bg-white hover:border-slate-100 shadow-sm'
                   }`}
               >
                 <div className="flex items-center gap-4">
@@ -100,7 +142,7 @@ const AreaCompetencyManager: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="font-bold text-slate-800 text-sm">{area.name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{area.level} • {area.competencies.length} Competencias</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{area.competencies.length} Competencias</p>
                   </div>
                 </div>
                 <ChevronRight className={`w-4 h-4 transition-transform ${selectedArea?.id === area.id ? 'text-[#57C5D5] translate-x-1' : 'text-slate-300'}`} />
@@ -196,15 +238,6 @@ const AreaCompetencyManager: React.FC = () => {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre del Área</label>
                 <input type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5]" placeholder="Ej. Arte y Cultura" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nivel Aplicable</label>
-                <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none">
-                  <option>Inicial</option>
-                  <option>Primaria</option>
-                  <option>Secundaria</option>
-                  <option>Todos</option>
-                </select>
               </div>
             </div>
             <footer className="p-6 bg-slate-50 border-t flex justify-end gap-3">

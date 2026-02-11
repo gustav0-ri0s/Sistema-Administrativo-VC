@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSummary } from '../types';
+import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSummary, CourseAssignment, InstitutionalSettings } from '../types';
 
 export const profileService = {
     async getAll() {
@@ -83,6 +83,22 @@ export const profileService = {
         return data;
     },
 
+    async getTeachers() {
+        console.log('profileService: getTeachers() called');
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('role', 'docente')
+            .eq('active', true)
+            .order('full_name', { ascending: true });
+
+        if (error) {
+            console.error('profileService: getTeachers() error:', error);
+            throw error;
+        }
+        return data as Profile[];
+    },
+
     async getActiveCount() {
         console.log('profileService: getActiveCount() called');
         const { count, error } = await supabase
@@ -95,6 +111,50 @@ export const profileService = {
             return 0;
         }
         return count || 0;
+    }
+};
+
+export const courseAssignmentService = {
+    async getAll() {
+        const { data, error } = await supabase
+            .from('course_assignments')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data.map((d: any) => ({
+            id: d.id.toString(),
+            courseId: d.area_id.toString(),
+            profileId: d.profile_id,
+            classroomId: d.classroom_id.toString(),
+            hoursPerWeek: d.hours_per_week
+        })) as CourseAssignment[];
+    },
+
+    async createBulk(assignments: Omit<CourseAssignment, 'id'>[]) {
+        const dbData = assignments.map(a => ({
+            area_id: parseInt(a.courseId),
+            profile_id: a.profileId,
+            classroom_id: parseInt(a.classroomId),
+            hours_per_week: a.hoursPerWeek
+        }));
+
+        const { data, error } = await supabase
+            .from('course_assignments')
+            .insert(dbData)
+            .select();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async delete(id: string | number) {
+        const { error } = await supabase
+            .from('course_assignments')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     }
 };
 
@@ -364,3 +424,175 @@ export const classroomService = {
     }
 };
 
+export const curricularAreaService = {
+    async getAll() {
+        console.log('curricularAreaService: getAll() called');
+        const { data, error } = await supabase
+            .from('curricular_areas')
+            .select(`
+                *,
+                competencies (*)
+            `)
+            .order('order', { ascending: true });
+
+        if (error) {
+            console.error('curricularAreaService: getAll() error:', error);
+            throw error;
+        }
+
+        // Map database snake_case to frontend camelCase if necessary, 
+        // though for competencies we need to be careful with is_evaluated vs isEvaluated
+        return data.map(area => ({
+            ...area,
+            level: area.level.charAt(0).toUpperCase() + area.level.slice(1), // Capitalize first letter to match type
+            competencies: area.competencies.map((comp: any) => ({
+                id: comp.id.toString(),
+                name: comp.name,
+                description: comp.description || '',
+                isEvaluated: comp.is_evaluated
+            }))
+        })) as CurricularArea[];
+    },
+
+    async updateCompetencyStatus(id: string | number, isEvaluated: boolean) {
+        const { error } = await supabase
+            .from('competencies')
+            .update({ is_evaluated: isEvaluated })
+            .eq('id', id);
+
+        if (error) throw error;
+    }
+};
+
+export const settingsService = {
+    async getInstitutionalInfo() {
+        const { data, error } = await supabase
+            .from('institutional_settings')
+            .select('*')
+            .eq('id', 1)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 is 'no rows found'
+
+        if (!data) return null;
+
+        return {
+            name: data.name,
+            slogan: data.slogan,
+            address: data.address,
+            city: data.city,
+            phones: data.phones,
+            directorName: data.director_name,
+            attendanceTolerance: data.attendance_tolerance ?? 15
+        } as InstitutionalSettings;
+    },
+
+    async updateInstitutionalInfo(info: InstitutionalSettings) {
+        const { error } = await supabase
+            .from('institutional_settings')
+            .upsert({
+                id: 1,
+                name: info.name,
+                slogan: info.slogan,
+                address: info.address,
+                city: info.city,
+                phones: info.phones,
+                director_name: info.directorName,
+                attendance_tolerance: info.attendanceTolerance,
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+    }
+};
+
+export const behaviorService = {
+    async getAll() {
+        const { data, error } = await supabase
+            .from('behavior_criteria')
+            .select('*')
+            .eq('active', true)
+            .order('id', { ascending: true });
+
+        if (error) throw error;
+        return data.map((d: any) => ({
+            id: d.id.toString(),
+            name: d.name,
+            weight: d.weight
+        }));
+    },
+    async saveAll(criteria: { id?: string, name: string, weight: string }[]) {
+        // Simple approach: delete all and re-insert for the whole list
+        // Or UPSERT. Let's use UPSERT if they have numeric IDs.
+        const dbData = criteria.map(c => ({
+            ...(c.id?.startsWith('bc') ? {} : { id: parseInt(c.id!) }),
+            name: c.name,
+            weight: c.weight,
+            active: true
+        }));
+
+        const { error } = await supabase
+            .from('behavior_criteria')
+            .upsert(dbData);
+        if (error) throw error;
+    },
+    async delete(id: string) {
+        const { error } = await supabase
+            .from('behavior_criteria')
+            .update({ active: false })
+            .eq('id', parseInt(id));
+        if (error) throw error;
+    }
+};
+
+export const commitmentService = {
+    async getAll() {
+        const { data, error } = await supabase
+            .from('family_commitments')
+            .select('*')
+            .eq('active', true)
+            .order('id', { ascending: true });
+
+        if (error) throw error;
+        return data.map((d: any) => ({
+            id: d.id.toString(),
+            description: d.description
+        }));
+    },
+    async saveAll(commitments: { id?: string, description: string }[]) {
+        const dbData = commitments.map(c => ({
+            ...(c.id ? { id: parseInt(c.id) } : {}),
+            description: c.description,
+            active: true
+        }));
+
+        const { error } = await supabase
+            .from('family_commitments')
+            .upsert(dbData);
+        if (error) throw error;
+    },
+    async delete(id: string) {
+        const { error } = await supabase
+            .from('family_commitments')
+            .update({ active: false })
+            .eq('id', parseInt(id));
+        if (error) throw error;
+    }
+};
+
+export const attendanceService = {
+    async getTypes() {
+        const { data, error } = await supabase
+            .from('attendance_types')
+            .select('*')
+            .eq('active', true)
+            .order('id', { ascending: true });
+
+        if (error) throw error;
+        return data.map((d: any) => ({
+            id: d.id.toString(),
+            name: d.name,
+            color: d.color
+        }));
+    }
+};
