@@ -177,7 +177,7 @@ const App: React.FC = () => {
       case 'academic-year':
         return <AcademicYearManager years={academicYears} setYears={setAcademicYears} />;
       case 'enrollment':
-        return <EnrollmentWizard academicYears={academicYears} />;
+        return <EnrollmentWizard academicYears={academicYears} onTabChange={setActiveTab} />;
       case 'areas':
         return <AreaCompetencyManager />;
       case 'course-assignments':

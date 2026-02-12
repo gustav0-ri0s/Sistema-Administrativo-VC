@@ -3,6 +3,7 @@ import React from 'react';
 import { NAVIGATION_ITEMS, ROLE_LABELS } from '../constants';
 import { Student, AcademicStatus, Profile, UserRole } from '../types';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
+import { settingsService } from '../services/database.service';
 import { LogOut, X } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,6 +17,21 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onClose, onLogout, currentUser }) => {
   const { selectedYear, isYearReadOnly } = useAcademicYear();
+  const [logoUrl, setLogoUrl] = React.useState('/image/logo.png');
+
+  React.useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const info = await settingsService.getInstitutionalInfo();
+        if (info?.logoUrl) {
+          setLogoUrl(info.logoUrl);
+        }
+      } catch (error) {
+        console.error('Error loading logo in sidebar:', error);
+      }
+    };
+    loadLogo();
+  }, []);
 
   if (!currentUser) return null;
 
@@ -46,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
         <div className="p-6 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white rounded-lg">
-              <img src="/image/logo.png" alt="Logo" className="w-6 h-6 object-contain" />
+              <img src={logoUrl} alt="Logo" className="w-6 h-6 object-contain" />
             </div>
             <div>
               <h1 className="font-bold text-sm leading-tight">Valores y Ciencias</h1>

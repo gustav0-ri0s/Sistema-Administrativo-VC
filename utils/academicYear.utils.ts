@@ -194,10 +194,26 @@ export function calculateYearActivation(
 }
 
 /**
- * Check if a year is read-only (closed or not active)
+ * Check if a year is completely read-only (closed)
+ * Planning and Open years allow modifications (enrollments, configs)
  */
 export function isYearReadOnly(year: AcademicYear): boolean {
-    return year.status === 'cerrado' || !year.is_active;
+    return year.status === 'cerrado';
+}
+
+/**
+ * Check if enrollment is allowed for this year
+ * Allowed in Planning (Jan-Feb) and Open (Mar-...) modes
+ */
+export function canEnroll(year: AcademicYear): boolean {
+    return year.status === 'planificación' || year.status === 'abierto';
+}
+
+/**
+ * Check if grades can be edited (requires year to be fully active/abierto)
+ */
+export function canModifyAcademicData(year: AcademicYear): boolean {
+    return year.status === 'abierto' && year.is_active;
 }
 
 /**

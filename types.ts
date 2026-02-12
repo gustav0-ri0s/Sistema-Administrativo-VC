@@ -13,7 +13,8 @@ export enum AcademicStatus {
   TRASLADADO = 'Trasladado',
   RETIRADO = 'Retirado',
   RESERVA = 'Reserva',
-  MATRICULADO = 'Matriculado'
+  MATRICULADO = 'Matriculado',
+  SIN_MATRICULA = 'Sin Matrícula'
 }
 
 export type YearStatus = 'abierto' | 'cerrado' | 'planificación';
@@ -102,6 +103,8 @@ export interface AcademicYear {
   year: number;
   status: YearStatus;
   is_active: boolean;
+  start_date?: string;
+  end_date?: string;
   bimestres: BimestreConfig[];
 }
 
@@ -143,6 +146,7 @@ export interface InstitutionalSettings {
   phones: string;
   directorName: string;
   attendanceTolerance: number;
+  logoUrl?: string;
 }
 
 // Academic Year Context Types

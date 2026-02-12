@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { Student, AcademicStatus } from '../types';
 import { studentService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
-import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2 } from 'lucide-react';
+import { useAcademicYear } from '../contexts/AcademicYearContext';
+import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2, Filter, Eye, Phone, MapPin, Briefcase, Heart, BellRing } from 'lucide-react';
 
 const StudentManagement: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -11,6 +12,8 @@ const StudentManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const { selectedYear } = useAcademicYear();
   const { showToast } = useToast();
 
   React.useEffect(() => {
@@ -34,6 +37,7 @@ const StudentManagement: React.FC = () => {
     last_name: '',
     email: '',
     birth_date: '',
+    address: '',
     academic_status: AcademicStatus.ACTIVO
   });
 
@@ -51,6 +55,7 @@ const StudentManagement: React.FC = () => {
       last_name: student.last_name,
       email: student.email,
       birth_date: student.birth_date,
+      address: student.address || '',
       academic_status: student.academic_status
     });
     setShowForm(true);
@@ -64,6 +69,7 @@ const StudentManagement: React.FC = () => {
       last_name: '',
       email: '',
       birth_date: '',
+      address: '',
       academic_status: AcademicStatus.ACTIVO
     });
     setShowForm(true);
@@ -77,26 +83,55 @@ const StudentManagement: React.FC = () => {
 
     try {
       if (editingStudent) {
-        // En una implementación real, aquí llamaríamos a studentService.update
-        setStudents(students.map(s => s.id === editingStudent.id ? { ...s, ...formData as Student } : s));
+        console.log('StudentManagement: Updating student...', editingStudent.id, formData);
+
+        // Remove virtual/join fields before sending to database
+        const { parents, ...updateData } = formData as any;
+
+        const updatedStudent = await studentService.update(editingStudent.id, {
+          ...updateData,
+          academic_year_id: selectedYear?.id
+        });
+
+        // Merge updated data into local state, preserving parents if they were already there
+        setStudents(students.map(s => s.id === editingStudent.id ? {
+          ...s,
+          ...updatedStudent,
+          parents: s.parents // Keep existing parents as they come from a different join
+        } : s));
+
+        showToast('success', 'La información se actualizó correctamente.', 'Alumno Actualizado');
       } else {
+        console.log('StudentManagement: Creating new student...', formData);
+
         const newStudentData: Partial<Student> = {
           ...formData,
           gender: 'M',
-          address: 'Dirección no especificada',
-          academic_year_id: (students.length > 0 ? students[0].academic_year_id : undefined),
+          academic_year_id: selectedYear?.id,
           parents: []
         };
         const savedStudent = await studentService.create(newStudentData);
         setStudents([savedStudent, ...students]);
+
+        showToast('success', 'El estudiante ha sido registrado en el sistema.', 'Nuevo Registro');
       }
 
       setShowForm(false);
       setEditingStudent(null);
-      showToast('success', 'Información del estudiante guardada con éxito.', '¡Éxito!');
     } catch (error: any) {
-      console.error('Error saving student:', error);
-      showToast('error', `No se pudo guardar la información: ${error.message || 'Error desconocido'}`, 'Error al Guardar');
+      console.error('StudentManagement: Error saving student:', error);
+      showToast('error', `Hubo un problema: ${error.message || 'Error de conexión con la base de datos'}`, 'Error al Guardar');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar este registro?')) return;
+    try {
+      await studentService.delete(id);
+      setStudents(students.filter(s => s.id !== id));
+      showToast('success', 'Estudiante eliminado correctamente.', 'Registro Eliminado');
+    } catch (error: any) {
+      showToast('error', `Error al eliminar: ${error.message}`, 'Error');
     }
   };
 
@@ -177,6 +212,18 @@ const StudentManagement: React.FC = () => {
                 value={formData.birth_date}
                 onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
+              />
+            </div>
+            <div className="lg:col-span-2 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-[#57C5D5]" /> Dirección de Domicilio
+              </label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
+                placeholder="Calle, Jr, Av, Número, Distrito..."
               />
             </div>
             <div className="lg:col-span-2 space-y-1">
@@ -262,7 +309,11 @@ const StudentManagement: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-xs font-bold text-slate-600">{s.dni}</td>
                 <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${s.academic_status === AcademicStatus.ACTIVO ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'
+                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${s.academic_status === AcademicStatus.ACTIVO || s.academic_status === AcademicStatus.MATRICULADO
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                    : s.academic_status === AcademicStatus.SIN_MATRICULA
+                      ? 'bg-amber-50 text-amber-600 border-amber-100'
+                      : 'bg-slate-50 text-slate-400 border-slate-200'
                     }`}>
                     {s.academic_status}
                   </span>
@@ -277,13 +328,18 @@ const StudentManagement: React.FC = () => {
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleDelete(s.id)}
+                      title="Eliminar Estudiante"
                       className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                    <button className="flex items-center gap-1 text-[10px] font-black text-[#57C5D5] hover:underline uppercase tracking-widest pl-2">
-                      Expediente
-                      <ChevronDown className="w-3 h-3" />
+                    <button
+                      onClick={() => setViewingStudent(s)}
+                      className="flex items-center gap-1 text-[10px] font-black text-[#57C5D5] hover:text-[#46b3c2] hover:underline uppercase tracking-widest pl-2 transition-colors"
+                    >
+                      <Eye className="w-3 h-3" />
+                      Ver Detalle
                     </button>
                   </div>
                 </td>
@@ -299,6 +355,147 @@ const StudentManagement: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Student Detail Modal (Emergency/Secretary View) */}
+      {viewingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+            <header className="p-8 bg-slate-900 text-white flex justify-between items-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <UserCircle className="w-24 h-24" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-[#57C5D5] flex items-center justify-center text-white text-2xl font-black">
+                    {viewingStudent.last_name.charAt(0)}{viewingStudent.first_name.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black uppercase tracking-tight">{viewingStudent.last_name}, {viewingStudent.first_name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="px-2 py-0.5 bg-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/20">DNI: {viewingStudent.dni}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${viewingStudent.academic_status === AcademicStatus.MATRICULADO || viewingStudent.academic_status === AcademicStatus.ACTIVO
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                        }`}>
+                        {viewingStudent.academic_status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingStudent(null)}
+                className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </header>
+
+            <div className="p-8 overflow-y-auto space-y-8 scrollbar-thin scrollbar-thumb-slate-200">
+              {/* Personal Info Section */}
+              <section className="space-y-4">
+                <h4 className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">
+                  <UserCircle className="w-4 h-4 text-[#57C5D5]" /> Información Personal
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-[#57C5D5]/50" />
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Fecha de Nacimiento</p>
+                      <p className="text-sm font-bold text-slate-700">{viewingStudent.birth_date || 'No registrada'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <MapPin className="absolute pointer-events-none opacity-0" />
+                    <MapPin className="w-5 h-5 text-[#57C5D5]/50" />
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Dirección</p>
+                      <p className="text-sm font-bold text-slate-700">{viewingStudent.address || 'No registrada'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-[#57C5D5]/50" />
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Email Institucional</p>
+                      <p className="text-sm font-bold text-slate-700">{viewingStudent.email || 'No asignado'}</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Family/Emergency Contact Section */}
+              <section className="space-y-4">
+                <h4 className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">
+                  <BellRing className="w-4 h-4 text-red-500" /> Contacto de Emergencia / Familia
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {viewingStudent.parents && viewingStudent.parents.length > 0 ? (
+                    viewingStudent.parents.map((parent, idx) => (
+                      <div key={idx} className={`p-6 rounded-3xl border-2 transition-all ${parent.is_guardian ? 'border-[#57C5D5] bg-[#57C5D5]/5 ring-4 ring-[#57C5D5]/5' : 'border-slate-100 bg-white'}`}>
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <span className="text-[9px] font-black uppercase text-[#57C5D5] tracking-widest leading-none block mb-1">
+                              {parent.relationship}
+                            </span>
+                            <p className="text-sm font-black text-slate-800 uppercase">{parent.full_name}</p>
+                          </div>
+                          {parent.is_guardian && (
+                            <span className="bg-[#57C5D5] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg shadow-[#57C5D5]/20">Apoderado</span>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <a
+                            href={`tel:${parent.phone}`}
+                            className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 hover:border-[#57C5D5] hover:shadow-md transition-all group"
+                          >
+                            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                              <Phone className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">Llamar Ahora</p>
+                              <p className="text-sm font-black text-slate-700">{parent.phone || 'Sin teléfono'}</p>
+                            </div>
+                          </a>
+
+                          <div className="flex items-start gap-3 px-1">
+                            <Briefcase className="w-4 h-4 text-slate-300 mt-1 shrink-0" />
+                            <div>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">Ocupación</p>
+                              <p className="text-[11px] font-medium text-slate-600">{parent.occupation || 'No especificada'}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3 px-1">
+                            <MapPin className="w-4 h-4 text-slate-300 mt-1 shrink-0" />
+                            <div>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">Dirección de Vivienda</p>
+                              <p className="text-[11px] font-medium text-slate-600 leading-tight">{parent.address || viewingStudent.address || 'No especificada'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full py-8 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No se encontraron datos familiares registrados</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                onClick={() => setViewingStudent(null)}
+                className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95"
+              >
+                Cerrar Expediente
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

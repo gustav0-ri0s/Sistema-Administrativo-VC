@@ -162,22 +162,73 @@ export const studentService = {
     async getAll() {
         const { data, error } = await supabase
             .from('students')
-            .select('*')
+            .select(`
+                *,
+                student_parents (
+                    relationship,
+                    is_guardian,
+                    parents (*)
+                )
+            `)
             .order('last_name', { ascending: true });
 
         if (error) throw error;
-        return data as Student[];
+
+        // Map the join table structure to the flat parents list expected by the UI
+        return data.map((s: any) => ({
+            ...s,
+            parents: s.student_parents?.map((sp: any) => ({
+                ...sp.parents,
+                relationship: sp.relationship,
+                is_guardian: sp.is_guardian
+            })) || []
+        })) as Student[];
     },
 
     async create(student: Partial<Student>) {
+        const { parents, ...dbData } = student as any;
         const { data, error } = await supabase
             .from('students')
-            .insert([student])
+            .insert([dbData])
             .select()
             .single();
 
         if (error) throw error;
         return data as Student;
+    },
+
+    async update(id: string, updates: Partial<Student>) {
+        const { parents, ...dbData } = updates as any;
+        const { data, error } = await supabase
+            .from('students')
+            .update(dbData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as Student;
+    },
+
+    async moveToClassroom(studentId: string, classroomId: number | string) {
+        const { data, error } = await supabase
+            .from('students')
+            .update({ classroom_id: classroomId })
+            .eq('id', studentId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as Student;
+    },
+
+    async delete(id: string) {
+        const { error } = await supabase
+            .from('students')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     },
 
     async getCountByYear(academicYearId: number) {
@@ -192,6 +243,33 @@ export const studentService = {
             return 0;
         }
         return count || 0;
+    },
+
+    async searchStudents(query: string) {
+        console.log('studentService: searchStudents() called with:', query);
+        const { data, error } = await supabase
+            .from('students')
+            .select(`
+                *,
+                student_parents (
+                    relationship,
+                    is_guardian,
+                    parents (*)
+                )
+            `)
+            .or(`dni.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+            .limit(10);
+
+        if (error) throw error;
+
+        return data.map((s: any) => ({
+            ...s,
+            parents: s.student_parents?.map((sp: any) => ({
+                ...sp.parents,
+                relationship: sp.relationship,
+                is_guardian: sp.is_guardian
+            })) || []
+        })) as Student[];
     }
 };
 
@@ -213,6 +291,22 @@ export const academicService = {
 
     async updateYear(id: number, updates: Partial<AcademicYear>) {
         console.log('DB Service: Updating year', id, 'with:', updates);
+
+        // If the status is being changed to 'cerrado', update students
+        if (updates.status === 'cerrado') {
+            console.log('DB Service: Closing year, updating students status...');
+            const { error: studentError } = await supabase
+                .from('students')
+                .update({ academic_status: 'sin_matricula' })
+                .eq('academic_year_id', id)
+                .eq('academic_status', 'matriculado');
+
+            if (studentError) {
+                console.error('DB Service: Error updating students on year close:', studentError);
+                // We keep going but log the error
+            }
+        }
+
         const { error } = await supabase
             .from('academic_years')
             .update(updates)
@@ -253,7 +347,7 @@ export const academicService = {
         console.log('DB Service: Year activated successfully');
     },
 
-    async updateBimestre(id: number, updates: { is_locked?: boolean; is_force_open?: boolean }) {
+    async updateBimestre(id: number, updates: { is_locked?: boolean; is_force_open?: boolean; start_date?: string; end_date?: string }) {
         console.log('DB Service: Updating bimestre', id, 'with:', updates);
         const { error } = await supabase
             .from('bimestres')
@@ -271,7 +365,13 @@ export const academicService = {
         console.log('DB Service: Creating year', year, 'with status', status);
         const { data: yearData, error: yearError } = await supabase
             .from('academic_years')
-            .insert([{ year, status, is_active: false }])
+            .insert([{
+                year,
+                status,
+                is_active: false,
+                start_date: `${year}-03-01`,
+                end_date: `${year}-12-20`
+            }])
             .select()
             .single();
 
@@ -358,7 +458,10 @@ export const classroomService = {
         console.log('classroomService: getAll() called');
         const { data, error } = await supabase
             .from('classrooms')
-            .select('*')
+            .select(`
+                *,
+                students (id)
+            `)
             .order('level', { ascending: true })
             .order('grade', { ascending: true })
             .order('section', { ascending: true });
@@ -368,12 +471,10 @@ export const classroomService = {
             throw error;
         }
 
-        // Since 'enrolled' is not in the DB yet, we'll default it to 0
-        // Eventually we should join with a student_enrollments table
         return data.map(item => ({
             ...item,
-            enrolled: 0,
-            active: item.active ?? true // Ensure active has a value
+            enrolled: (item.students as any[])?.length || 0,
+            active: item.active ?? true
         })) as Classroom[];
     },
 
@@ -414,7 +515,18 @@ export const classroomService = {
         return data as Classroom;
     },
 
-    async delete(id: string) {
+    async getStudents(classroomId: number | string) {
+        const { data, error } = await supabase
+            .from('students')
+            .select('*')
+            .eq('classroom_id', classroomId)
+            .order('last_name', { ascending: true });
+
+        if (error) throw error;
+        return data as Student[];
+    },
+
+    async delete(id: string | number) {
         const { error } = await supabase
             .from('classrooms')
             .delete()
@@ -440,11 +552,10 @@ export const curricularAreaService = {
             throw error;
         }
 
-        // Map database snake_case to frontend camelCase if necessary, 
-        // though for competencies we need to be careful with is_evaluated vs isEvaluated
+        // Map database snake_case to frontend camelCase if necessary
         return data.map(area => ({
             ...area,
-            level: area.level.charAt(0).toUpperCase() + area.level.slice(1), // Capitalize first letter to match type
+            level: area.level.charAt(0).toUpperCase() + area.level.slice(1),
             competencies: area.competencies.map((comp: any) => ({
                 id: comp.id.toString(),
                 name: comp.name,
@@ -483,7 +594,8 @@ export const settingsService = {
             city: data.city,
             phones: data.phones,
             directorName: data.director_name,
-            attendanceTolerance: data.attendance_tolerance ?? 15
+            attendanceTolerance: data.attendance_tolerance ?? 15,
+            logoUrl: data.logo_url || '/image/logo.png'
         } as InstitutionalSettings;
     },
 
@@ -499,10 +611,29 @@ export const settingsService = {
                 phones: info.phones,
                 director_name: info.directorName,
                 attendance_tolerance: info.attendanceTolerance,
+                logo_url: info.logoUrl,
                 updated_at: new Date().toISOString()
             });
 
         if (error) throw error;
+    },
+
+    async uploadLogo(file: File) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `logo_${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('institucion')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('institucion')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
     }
 };
 
@@ -594,5 +725,77 @@ export const attendanceService = {
             name: d.name,
             color: d.color
         }));
+    }
+};
+
+export const enrollmentService = {
+    async completeEnrollment(enrollmentData: {
+        student: Partial<Student>,
+        parents: any[],
+        academicYearId: number,
+        classroomId?: number
+    }) {
+        const { student, parents, academicYearId, classroomId } = enrollmentData;
+
+        // 1. Upsert Student
+        const { data: savedStudent, error: studentError } = await supabase
+            .from('students')
+            .upsert({
+                id: student.id || undefined,
+                dni: student.dni,
+                first_name: student.first_name,
+                last_name: student.last_name,
+                email: student.email,
+                gender: student.gender || 'M',
+                address: student.address,
+                birth_date: student.birth_date,
+                academic_status: 'matriculado',
+                academic_year_id: academicYearId,
+                classroom_id: classroomId
+            }, { onConflict: 'dni' })
+            .select()
+            .single();
+
+        if (studentError) throw studentError;
+
+        // 2. Process Parents
+        for (const p of parents) {
+            if (!p.dni) continue;
+
+            // Upsert Parent by DNI
+            const { data: savedParent, error: parentError } = await supabase
+                .from('parents')
+                .upsert({
+                    dni: p.dni,
+                    full_name: p.full_name,
+                    phone: p.phone,
+                    occupation: p.occupation,
+                    address: p.address
+                }, { onConflict: 'dni' })
+                .select()
+                .single();
+
+            if (parentError) throw parentError;
+
+            // Link in student_parents
+            const { error: linkError } = await supabase
+                .from('student_parents')
+                .upsert({
+                    student_id: savedStudent.id,
+                    parent_id: savedParent.id,
+                    relationship: p.relationship,
+                    is_guardian: p.is_guardian
+                }, { onConflict: 'student_id,parent_id' });
+
+            if (linkError) throw linkError;
+        }
+
+        // 3. Update Classroom if specified (Optional: would need a bridge table or field in students)
+        if (classroomId) {
+            // Depending on how classroom assignment is stored. 
+            // Assuming students table has a classroom_id (checking schema below)
+        }
+
+        return savedStudent;
     }
 };

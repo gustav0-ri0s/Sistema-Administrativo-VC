@@ -19,6 +19,8 @@ const SettingsManager: React.FC = () => {
   const [editingBehaviorId, setEditingBehaviorId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
   const [instInfo, setInstInfo] = useState<InstitutionalSettings>({
@@ -28,7 +30,8 @@ const SettingsManager: React.FC = () => {
     city: '',
     phones: '',
     directorName: '',
-    attendanceTolerance: 15
+    attendanceTolerance: 15,
+    logoUrl: '/image/logo.png'
   });
 
   const [scales, setScales] = useState<GradeScale[]>([
@@ -156,6 +159,33 @@ const SettingsManager: React.FC = () => {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'Por favor, selecciona un archivo de imagen.', 'Error');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      showToast('error', 'El logo no debe pesar más de 2MB.', 'Imagen muy pesada');
+      return;
+    }
+
+    try {
+      setIsUploadingLogo(true);
+      const publicUrl = await settingsService.uploadLogo(file);
+      setInstInfo(prev => ({ ...prev, logoUrl: publicUrl }));
+      showToast('success', 'Logo cargado temporalmente. Presiona "Guardar" para confirmar.', 'Imagen Lista');
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      showToast('error', 'No se pudo subir la imagen: ' + error.message, 'Error');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const TabButton = ({ id, label, icon: Icon }: { id: any, label: string, icon: any }) => (
     <button
       onClick={() => setActiveTab(id)}
@@ -268,14 +298,52 @@ const SettingsManager: React.FC = () => {
                 </div>
               </div>
               <div className="lg:col-span-4 flex flex-col items-center">
-                <div className="w-full aspect-square max-w-[280px] p-8 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] flex flex-col items-center justify-center text-center group hover:border-[#57C5D5]/50 transition-all hover:bg-white">
-                  <div className="w-32 h-32 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-6 overflow-hidden border border-slate-100 group-hover:scale-105 transition-transform duration-500">
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">SIN LOGO</span>
+                <div className="w-full aspect-square max-w-[280px] p-8 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] flex flex-col items-center justify-center text-center group hover:border-[#57C5D5]/50 transition-all hover:bg-white relative overflow-hidden">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleLogoUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+
+                  <div className="w-32 h-32 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-6 overflow-hidden border border-slate-100 group-hover:scale-105 transition-transform duration-500 relative">
+                    {instInfo.logoUrl ? (
+                      <img src={instInfo.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <img src="/image/logo.png" alt="Logo Predeterminado" className="w-full h-full object-contain p-2 opacity-50" />
+                    )}
+                    {isUploadingLogo && (
+                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-[#57C5D5] animate-spin" />
+                      </div>
+                    )}
                   </div>
+
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Logo Institucional</p>
-                  <button className="flex items-center gap-2 px-6 py-2 bg-[#57C5D5]/10 text-[#57C5D5] rounded-xl text-[10px] font-black hover:bg-[#57C5D5] hover:text-white transition-all uppercase tracking-widest">
-                    <Upload className="w-3 h-3" /> Cambiar Imagen
+
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    className="flex items-center gap-2 px-6 py-2 bg-[#57C5D5]/10 text-[#57C5D5] rounded-xl text-[10px] font-black hover:bg-[#57C5D5] hover:text-white transition-all uppercase tracking-widest disabled:opacity-50"
+                  >
+                    {isUploadingLogo ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                    {instInfo.logoUrl !== '/image/logo.png' ? 'Cambiar Logo' : 'Personalizar Logo'}
                   </button>
+
+                  <div className="mt-4 flex flex-col items-center gap-2">
+                    {instInfo.logoUrl !== '/image/logo.png' && (
+                      <button
+                        onClick={() => setInstInfo(prev => ({ ...prev, logoUrl: '/image/logo.png' }))}
+                        className="text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-[#57C5D5] transition-colors"
+                      >
+                        Restaurar Predeterminado
+                      </button>
+                    )}
+                    <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest text-center mt-2 px-4 leading-relaxed">
+                      Predeterminado: /public/image/logo.png
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

@@ -14,7 +14,7 @@ interface AcademicYearManagerProps {
 
 const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsYears, setYears: propsSetYears }) => {
   // Use context for global state
-  const { academicYears, refreshYears, selectedYear } = useAcademicYear();
+  const { academicYears, refreshYears, selectedYear, setSelectedYear } = useAcademicYear();
   const { showToast } = useToast();
 
   // Use context years if available, otherwise use props
@@ -33,6 +33,9 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
       console.error('AcademicYearManager: Error fetching years:', e);
     }
   };
+
+  const [configYear, setConfigYear] = React.useState<AcademicYear | null>(null);
+  const [showConfigModal, setShowConfigModal] = React.useState(false);
 
   React.useEffect(() => {
     console.log('AcademicYearManager: Component mounted, years.length =', years.length);
@@ -98,6 +101,32 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
     }
   };
 
+  const handleSaveDates = async (yearId: number, startDate: string, endDate: string, bimestresData: { id: number, start_date: string, end_date: string }[]) => {
+    try {
+      // Update year dates
+      await academicService.updateYear(yearId, {
+        start_date: startDate,
+        end_date: endDate
+      });
+
+      // Update each bimestre dates
+      const promises = bimestresData.map(bim =>
+        academicService.updateBimestre(bim.id, {
+          start_date: bim.start_date,
+          end_date: bim.end_date
+        })
+      );
+
+      await Promise.all(promises);
+
+      showToast('success', 'Configuración completa guardada con éxito', 'Éxito');
+      setShowConfigModal(false);
+      await fetchYears();
+    } catch (e) {
+      showToast('error', 'Error al guardar la configuración: ' + (e as Error).message, 'Error');
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -122,12 +151,20 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
         {[...years].sort((a, b) => b.year - a.year).map((y) => (
           <div
             key={y.year}
-            className={`p-6 rounded-3xl border-2 transition-all relative overflow-hidden ${y.is_active ? 'border-[#57C5D5] bg-white ring-8 ring-[#57C5D5]/5 shadow-xl' : 'border-slate-100 bg-slate-50 shadow-sm'
+            onClick={() => setSelectedYear(y)}
+            className={`p-6 rounded-3xl border-2 transition-all relative overflow-hidden cursor-pointer group ${selectedYear?.id === y.id
+              ? 'border-[#57C5D5] bg-white ring-8 ring-[#57C5D5]/5 shadow-xl'
+              : 'border-slate-100 bg-slate-50 shadow-sm hover:border-[#57C5D5]/30'
               }`}
           >
             {y.is_active && (
               <div className="absolute top-0 right-0 bg-[#57C5D5] text-white px-4 py-1.5 rounded-bl-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Operando
+              </div>
+            )}
+            {selectedYear?.id === y.id && !y.is_active && (
+              <div className="absolute top-0 right-0 bg-slate-400 text-white px-4 py-1.5 rounded-bl-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Visualizando
               </div>
             )}
 
@@ -165,7 +202,13 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
                   <option value="cerrado">Cerrado</option>
                 </select>
 
-                <button className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-400 hover:text-[#57C5D5] transition-colors">
+                <button
+                  onClick={() => {
+                    setConfigYear(y);
+                    setShowConfigModal(true);
+                  }}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-400 hover:text-[#57C5D5] hover:border-[#57C5D5] transition-colors"
+                >
                   Configurar
                 </button>
               </div>
@@ -174,7 +217,7 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
         ))}
       </div>
 
-      {activeYear && (
+      {selectedYear && (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
           <header className="p-6 bg-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -182,7 +225,12 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
                 <CalendarDays className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h4 className="font-black text-lg uppercase tracking-tight">Cronograma Activo {activeYear.year}</h4>
+                <h4 className="font-black text-lg uppercase tracking-tight">
+                  Cronograma {selectedYear.year}
+                  <span className="ml-3 px-2 py-0.5 bg-white/10 rounded-full text-[9px] font-bold border border-white/20 opacity-70">
+                    {selectedYear.status}
+                  </span>
+                </h4>
                 <p className="text-[#57C5D5] text-[10px] font-bold uppercase tracking-[0.2em]">Control de periodos de evaluación</p>
               </div>
             </div>
@@ -196,7 +244,7 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
 
           <div className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {activeYear.bimestres.map((bim) => (
+              {selectedYear.bimestres.map((bim) => (
                 <div
                   key={bim.id}
                   className={`group p-6 rounded-3xl border-2 transition-all duration-300 relative ${bim.is_locked
@@ -269,6 +317,124 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
                   Al cerrar un bimestre con el icono de candado, se deshabilita automáticamente la edición de asistencia, notas y criterios transversales para todos los docentes de Inicial, Primaria y Secundaria. Solo el Administrador puede revertir esta acción.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configuration Modal */}
+      {showConfigModal && configYear && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-8 pb-4">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-4 bg-[#57C5D5]/10 rounded-2xl text-[#57C5D5]">
+                  <Calendar className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 leading-none">Configurar Periodo</h3>
+                  <p className="text-slate-500 text-sm mt-1 font-bold uppercase tracking-widest">Año Escolar {configYear.year}</p>
+                </div>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+
+                const bims = configYear.bimestres.map(b => ({
+                  id: b.id,
+                  start_date: formData.get(`bim_${b.id}_start`) as string,
+                  end_date: formData.get(`bim_${b.id}_end`) as string
+                }));
+
+                handleSaveDates(
+                  configYear.id,
+                  formData.get('start_date') as string,
+                  formData.get('end_date') as string,
+                  bims
+                );
+              }} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Inicio Año</label>
+                    <input
+                      name="start_date"
+                      type="date"
+                      required
+                      defaultValue={configYear.start_date || `${configYear.year}-03-01`}
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-700 outline-none focus:border-[#57C5D5] focus:bg-white transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Fin Año</label>
+                    <input
+                      name="end_date"
+                      type="date"
+                      required
+                      defaultValue={configYear.end_date || `${configYear.year}-12-20`}
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-700 outline-none focus:border-[#57C5D5] focus:bg-white transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                    <CalendarDays className="w-3 h-3 text-[#57C5D5]" /> Fechas por Bimestre
+                  </h4>
+                  <div className="space-y-4">
+                    {configYear.bimestres.map((bim) => (
+                      <div key={bim.id} className="p-4 bg-slate-50 rounded-2xl space-y-3">
+                        <p className="text-[10px] font-black text-[#57C5D5] uppercase">{bim.name}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-slate-400 uppercase">Inicio</label>
+                            <input
+                              name={`bim_${bim.id}_start`}
+                              type="date"
+                              required
+                              defaultValue={bim.start_date}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-slate-400 uppercase">Fin</label>
+                            <input
+                              name={`bim_${bim.id}_end`}
+                              type="date"
+                              required
+                              defaultValue={bim.end_date}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+                  <p className="text-[9px] text-amber-700 font-medium leading-relaxed">
+                    Asegúrese que las fechas de los bimestres no se traslapen y estén dentro del rango del año escolar.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigModal(false)}
+                    className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-6 py-4 bg-[#57C5D5] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#46b3c2] shadow-lg shadow-[#57C5D5]/30 transition-all active:scale-95"
+                  >
+                    Guardar Todo
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { mockProfiles, mockIncidents as fallbackIncidents } from '../services/mo
 import { academicService, incidentService, profileService, studentService, classroomService } from '../services/database.service';
 
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink, Loader2 } from 'lucide-react';
+import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink, Loader2, Calendar } from 'lucide-react';
 
 interface EnrollmentDashboardProps {
   selectedYear?: AcademicYear;
@@ -95,10 +95,10 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
       {/* Planning Mode Banner */}
       {isPlanning && !isActive && (
         <div className="bg-[#57C5D5]/10 border-2 border-[#57C5D5]/30 rounded-2xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-[#57C5D5]" />
+          <Calendar className="w-5 h-5 text-[#57C5D5]" />
           <div>
-            <p className="text-sm font-bold text-[#57C5D5]">Modo Planificación</p>
-            <p className="text-xs text-slate-600">Este año está en fase de planificación. Active el año para comenzar matrículas.</p>
+            <p className="text-sm font-bold text-[#57C5D5]">Periodo de Matrícula {selectedYear?.year}</p>
+            <p className="text-xs text-slate-600">El sistema está abierto para el registro de nuevos estudiantes y re-matrículas. Las clases aún no han iniciado.</p>
           </div>
         </div>
       )}
