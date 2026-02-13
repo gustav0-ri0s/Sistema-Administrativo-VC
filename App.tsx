@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Login from './components/Login';
 import ProfileManagement from './components/ProfileManagement';
@@ -11,20 +11,17 @@ import ClassroomManager from './components/ClassroomManager';
 import AreaCompetencyManager from './components/AreaCompetencyManager';
 import CourseAssignmentMatrix from './components/CourseAssignmentMatrix';
 import SettingsManager from './components/SettingsManager';
+import RolesManager from './components/RolesManager';
 import RestrictedAccess from './components/RestrictedAccess';
-import { UserRole, AcademicYear, BimestreConfig, Profile } from './types';
-import { academicService, profileService } from './services/database.service';
+import ChangePassword from './components/ChangePassword';
+
+import { UserRole, AcademicYear, Profile } from './types';
+import { profileService, rolePermissionService } from './services/database.service';
+
 import { supabase } from './services/supabase';
 import { AcademicYearProvider, useAcademicYear } from './contexts/AcademicYearContext';
 import { ToastProvider } from './contexts/ToastContext';
-import { Menu, School, Calendar, ChevronDown, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-
-const createDefaultBimestres = (year: number): BimestreConfig[] => [
-  { id: 1, name: 'I Bimestre', start_date: `${year}-03-01`, end_date: `${year}-05-15`, is_locked: false },
-  { id: 2, name: 'II Bimestre', start_date: `${year}-05-20`, end_date: `${year}-07-25`, is_locked: true },
-  { id: 3, name: 'III Bimestre', start_date: `${year}-08-10`, end_date: `${year}-10-15`, is_locked: true },
-  { id: 4, name: 'IV Bimestre', start_date: `${year}-10-20`, end_date: `${year}-12-20`, is_locked: true },
-];
+import { Menu, School, Calendar, ChevronDown, CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 const ALLOWED_ROLES = [
   UserRole.ADMIN,
@@ -38,160 +35,212 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isLoading) {
-        console.warn('App: Initialization timeout reached (15s)');
-        setIsLoading(false);
-      }
-    }, 15000);
-
-    const fetchYears = async () => {
-      try {
-        console.log('App: Fetching academic years via context if needed...');
-        // We rely on AcademicYearContext's refreshYears which is called on its mount.
-        // But we can call it here too if we want to be sure.
-      } catch (e) {
-        console.error('App: Error fetching academic years:', e);
-      }
-    };
-
-    const loadUserData = async (userId: string) => {
-      try {
-        const userProfile = await profileService.getById(userId);
-        if (userProfile) {
-          setCurrentUser(userProfile);
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-          alert('Tu cuenta de usuario no tiene un perfil administrativo asociado.');
-        }
-      } catch (e) {
-        console.error('Error loading profile:', e);
-      }
-    };
-
-    const initializeAuth = async () => {
-      try {
-        console.log('App: Initializing auth stage 1 (getSession)...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.warn('App: Session error:', sessionError);
-        }
-
-        if (session) {
-          console.log('App: Session found for User ID:', session.user.id);
-          await loadUserData(session.user.id);
-          await fetchYears();
-        } else {
-          console.log('App: No session found, redirecting to Login');
-        }
-
-        console.log('App: Auth stage 1 complete');
-      } catch (error) {
-        console.error('CRITICAL: App failed to initialize:', error);
-      } finally {
-        setIsLoading(false);
-        console.log('App: isLoading set to false');
-      }
-    };
-
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('App: Auth state change event:', event);
-      if (session) {
-        console.log('App: New session detected, loading data...');
-        await loadUserData(session.user.id);
-        await fetchYears();
-      } else {
-        setIsAuthenticated(false);
-        setCurrentUser(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timer);
-    };
-  }, []);
-
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [viewingYear, setViewingYear] = useState<number>(new Date().getFullYear());
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const { academicYears, setAcademicYears, refreshYears } = useAcademicYear();
 
   const selectedYearData = useMemo(() =>
     academicYears.find(y => y.year === viewingYear),
     [viewingYear, academicYears]
   );
 
-  const handleLogin = (email: string) => {
-    // La sesión la maneja el componente Login vía supabase.auth.signInWithPassword
-    // onAuthStateChange en el useEffect detectará el cambio y cargará el perfil
+  const loadUserData = useCallback(async (userId: string) => {
+    try {
+      console.log('App: Fetching profile for:', userId);
+
+      // Add a timeout to the fetch itself
+      const fetchPromise = profileService.getById(userId);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT_DB')), 5000)
+      );
+
+      const userProfile = await Promise.race([fetchPromise, timeoutPromise]) as Profile;
+
+      if (userProfile) {
+        console.log('App: Profile loaded success');
+        setCurrentUser(userProfile);
+
+        try {
+          const perms = await rolePermissionService.getByRole(userProfile.role);
+          if (perms) {
+            setUserPermissions(perms.modules);
+          } else if (userProfile.role === UserRole.ADMIN) {
+            setUserPermissions(['dashboard', 'academic-year', 'enrollment', 'areas', 'course-assignments', 'profiles', 'students', 'classrooms', 'settings', 'roles']);
+          }
+        } catch (e) {
+          console.warn('App: Permissions load error, using default');
+          if (userProfile.role === UserRole.ADMIN) {
+            setUserPermissions(['dashboard', 'academic-year', 'enrollment', 'areas', 'course-assignments', 'profiles', 'students', 'classrooms', 'settings', 'roles']);
+          }
+        }
+        setIsAuthenticated(true);
+      } else {
+        console.warn('App: Empty profile');
+        setIsAuthenticated(false);
+      }
+    } catch (e: any) {
+      console.error('App: loadUserData failed:', e);
+      if (e.message === 'TIMEOUT_DB') {
+        setLoadError('La base de datos está tardando demasiado en responder.');
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    // Safety Force-Start: No matter what, stop loading after 8 seconds
+    const globalTimeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        console.warn('App: Safety bypass triggered');
+        setIsLoading(false);
+      }
+    }, 8000);
+
+    const initialize = async () => {
+      try {
+        console.log('App: Initializing process (once)...');
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session && isMounted) {
+          console.log('App: Found active session during init');
+          await loadUserData(session.user.id);
+          refreshYears();
+        } else {
+          console.log('App: No session active during init');
+        }
+      } catch (err) {
+        console.error('App: Initial load error:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initialize();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      console.log('App: Auth change event handler:', event);
+
+      if (event === 'SIGNED_IN') {
+        if (session) {
+          console.log('App: User signed in, loading data...');
+          await loadUserData(session.user.id);
+          refreshYears();
+        }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('App: User signed out, clearing state...');
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setUserPermissions([]);
+      }
+
+      // Stop loading on any major auth transition
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+      clearTimeout(globalTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleManualBypass = () => {
+    console.log('App: Manual bypass clicked');
+    setIsLoading(false);
   };
 
-  const handleLogout = async () => {
-    console.log('App: Logout initiated...');
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      console.log('App: Sign out successful');
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-      setActiveTab('dashboard');
-    } catch (e) {
-      console.error('App: Error during logout:', e);
-      // Fallback: forcefully clear state and reload if necessary
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-      window.location.reload(); // Hard reset as safety measure
-    }
+  const handleReset = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 text-[#57C5D5] animate-spin" />
-        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando Sistema...</p>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-slate-100 rounded-full animate-pulse"></div>
+          <div className="absolute inset-0 w-20 h-20 border-t-4 border-[#57C5D5] rounded-full animate-spin"></div>
+        </div>
+        <div className="mt-8 space-y-2">
+          <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Iniciando Seguridad</h2>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[200px] leading-relaxed">Verificando credenciales institucionales...</p>
+        </div>
+
+        {/* Helper controls if it takes too long */}
+        <div className="mt-12 flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500">
+          <button
+            onClick={handleManualBypass}
+            className="text-[10px] font-black text-[#57C5D5] uppercase tracking-widest hover:text-[#46b3c2] transition-colors"
+          >
+            ¿Demora demasiado? Omitir Carga
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-6 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all"
+          >
+            <RefreshCw className="w-3 h-3" /> Reiniciar Sesión
+          </button>
+        </div>
+
+        {loadError && (
+          <div className="mt-8 p-4 bg-amber-50 rounded-2xl border border-amber-100 max-w-xs">
+            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">{loadError}</p>
+          </div>
+        )}
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={() => { }} />;
   }
 
-  // Check for restricted access
+  // 1. FORCE PASSWORD CHANGE FLOW (Global Security Priority)
+  if (currentUser?.force_password_change) {
+    return (
+      <ChangePassword
+        userId={currentUser.id}
+        onSuccess={() => {
+          // Refresh user data to clear the flag in state
+          console.log('App: Password changed successfully, refreshing state...');
+          const updatedUser = { ...currentUser, force_password_change: false };
+          setCurrentUser(updatedUser);
+        }}
+      />
+    );
+  }
+
+  // 2. ROLE ACCESS RESTRICTION
   const isAccessRestricted = currentUser && !ALLOWED_ROLES.includes(currentUser.role);
   if (isAccessRestricted && currentUser) {
-    return <RestrictedAccess role={currentUser.role} onLogout={handleLogout} />;
+    return <RestrictedAccess role={currentUser.role} onLogout={handleReset} />;
   }
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <EnrollmentDashboard selectedYear={selectedYearData} />;
-      case 'academic-year':
-        return <AcademicYearManager years={academicYears} setYears={setAcademicYears} />;
-      case 'enrollment':
-        return <EnrollmentWizard academicYears={academicYears} onTabChange={setActiveTab} />;
-      case 'areas':
-        return <AreaCompetencyManager />;
-      case 'course-assignments':
-        return <CourseAssignmentMatrix />;
-      case 'profiles':
-        return <ProfileManagement />;
-      case 'students':
-        return <StudentManagement />;
-      case 'classrooms':
-        return <ClassroomManager />;
-      case 'settings':
-        return <SettingsManager />;
-      default:
-        return <EnrollmentDashboard selectedYear={selectedYearData} />;
+      case 'dashboard': return <EnrollmentDashboard selectedYear={selectedYearData} />;
+      case 'academic-year': return <AcademicYearManager years={academicYears} setYears={setAcademicYears} />;
+      case 'enrollment': return <EnrollmentWizard academicYears={academicYears} onTabChange={setActiveTab} />;
+      case 'areas': return <AreaCompetencyManager />;
+      case 'course-assignments': return <CourseAssignmentMatrix />;
+      case 'profiles': return <ProfileManagement />;
+      case 'students': return <StudentManagement />;
+      case 'classrooms': return <ClassroomManager />;
+      case 'settings': return <SettingsManager />;
+      case 'roles': return <RolesManager />;
+      default: return <EnrollmentDashboard selectedYear={selectedYearData} />;
     }
   };
 
@@ -202,8 +251,9 @@ const App: React.FC = () => {
         setActiveTab={setActiveTab}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        onLogout={handleLogout}
+        onLogout={handleReset}
         currentUser={currentUser}
+        userPermissions={userPermissions}
       />
 
       <div className="lg:pl-64 flex flex-col min-h-screen transition-all duration-300">
@@ -214,8 +264,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="hidden lg:flex items-center gap-2">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${selectedYearData?.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'
-              }`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${selectedYearData?.is_active ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
               {selectedYearData?.is_active ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
               {selectedYearData?.is_active ? 'Ciclo Operativo' : selectedYearData?.status === 'planificación' ? 'Modo Planificación' : 'Modo Histórico'}
             </div>
@@ -231,23 +280,16 @@ const App: React.FC = () => {
 
               <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-100 shadow-2xl rounded-2xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-50">
                 <p className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seleccionar Año</p>
-                {academicYears.length > 0 ? (
-                  academicYears.sort((a, b) => b.year - a.year).map(y => (
-                    <button
-                      key={y.year}
-                      onClick={() => {
-                        setViewingYear(y.year);
-                        // Optional: trigger context update if needed
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm font-semibold flex items-center justify-between hover:bg-slate-50 ${viewingYear === y.year ? 'text-[#57C5D5]' : 'text-slate-600'}`}
-                    >
-                      <span>Ciclo Académico {y.year}</span>
-                      {y.is_active && <span className="text-[8px] bg-[#57C5D5] text-white px-2 py-0.5 rounded-full uppercase">Activo</span>}
-                    </button>
-                  ))
-                ) : (
-                  <p className="px-4 py-2 text-[10px] text-slate-400">Cargando años...</p>
-                )}
+                {academicYears.sort((a, b) => b.year - a.year).map(y => (
+                  <button
+                    key={y.year}
+                    onClick={() => setViewingYear(y.year)}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-semibold flex items-center justify-between hover:bg-slate-50 ${viewingYear === y.year ? 'text-[#57C5D5]' : 'text-slate-600'}`}
+                  >
+                    <span>Ciclo Académico {y.year}</span>
+                    {y.is_active && <span className="text-[8px] bg-[#57C5D5] text-white px-2 py-0.5 rounded-full uppercase">Activo</span>}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -274,7 +316,6 @@ const App: React.FC = () => {
   );
 };
 
-// Wrap the entire app with the Academic Year Provider
 const AppWithProvider: React.FC = () => {
   return (
     <AcademicYearProvider>

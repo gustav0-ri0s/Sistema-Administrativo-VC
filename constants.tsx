@@ -44,4 +44,6 @@ export const NAVIGATION_ITEMS = [
   { id: 'students', label: 'Estudiantes', icon: <GraduationCap className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.SECRETARIA] },
   { id: 'classrooms', label: 'Aulas', icon: <BookOpen className="w-5 h-5" />, roles: [UserRole.ADMIN] },
   { id: 'settings', label: 'Ajustes', icon: <Settings className="w-5 h-5" />, roles: [UserRole.ADMIN] },
+  { id: 'roles', label: 'Roles y Permisos', icon: <ShieldCheck className="w-5 h-5" />, roles: [UserRole.ADMIN] },
 ];
+

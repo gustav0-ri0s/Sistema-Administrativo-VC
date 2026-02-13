@@ -146,19 +146,20 @@ const StudentManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 text-left">Padron de Estudiantes</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900 text-left">Padron de Estudiantes</h2>
           <p className="text-slate-500 text-sm text-left">Registro oficial de la I.E.P. 'Valores y Ciencias'.</p>
         </div>
         <button
           onClick={handleAddNewClick}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all"
+          className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           Registrar Estudiante
         </button>
       </header>
+
 
       {showForm && (
         <div className="bg-white p-8 rounded-3xl border-2 border-[#57C5D5]/20 shadow-2xl animate-in slide-in-from-top-4 duration-300">
@@ -277,84 +278,87 @@ const StudentManagement: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estudiante</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Correo Institucional</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">DNI</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredStudents.map((s) => (
-              <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#57C5D5]/10 flex items-center justify-center text-[#57C5D5] font-black text-xs">
-                      {s.last_name.charAt(0)}{s.first_name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800 uppercase text-[11px] leading-tight">{s.last_name}, {s.first_name}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Fec: {s.birth_date}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-[#57C5D5]" />
-                    <span className="text-xs text-slate-600 font-medium">{s.email || 'No asignado'}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-xs font-bold text-slate-600">{s.dni}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${s.academic_status === AcademicStatus.ACTIVO || s.academic_status === AcademicStatus.MATRICULADO
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                    : s.academic_status === AcademicStatus.SIN_MATRICULA
-                      ? 'bg-amber-50 text-amber-600 border-amber-100'
-                      : 'bg-slate-50 text-slate-400 border-slate-200'
-                    }`}>
-                    {s.academic_status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleEditClick(s)}
-                      title="Editar Estudiante"
-                      className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-[#57C5D5] hover:bg-[#57C5D5]/5 transition-all"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(s.id)}
-                      title="Eliminar Estudiante"
-                      className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewingStudent(s)}
-                      className="flex items-center gap-1 text-[10px] font-black text-[#57C5D5] hover:text-[#46b3c2] hover:underline uppercase tracking-widest pl-2 transition-colors"
-                    >
-                      <Eye className="w-3 h-3" />
-                      Ver Detalle
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filteredStudents.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[800px]">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">
-                  No se encontraron estudiantes con esos criterios
-                </td>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estudiante</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Correo Institucional</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">DNI</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStudents.map((s) => (
+                <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#57C5D5]/10 flex items-center justify-center text-[#57C5D5] font-black text-xs">
+                        {s.last_name.charAt(0)}{s.first_name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800 uppercase text-[11px] leading-tight">{s.last_name}, {s.first_name}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Fec: {s.birth_date}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-[#57C5D5]" />
+                      <span className="text-xs text-slate-600 font-medium">{s.email || 'No asignado'}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-xs font-bold text-slate-600">{s.dni}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${s.academic_status === AcademicStatus.ACTIVO || s.academic_status === AcademicStatus.MATRICULADO
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                      : s.academic_status === AcademicStatus.SIN_MATRICULA
+                        ? 'bg-amber-50 text-amber-600 border-amber-100'
+                        : 'bg-slate-50 text-slate-400 border-slate-200'
+                      }`}>
+                      {s.academic_status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleEditClick(s)}
+                        title="Editar Estudiante"
+                        className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-[#57C5D5] hover:bg-[#57C5D5]/5 transition-all"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        title="Eliminar Estudiante"
+                        className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewingStudent(s)}
+                        className="flex items-center gap-1 text-[10px] font-black text-[#57C5D5] hover:text-[#46b3c2] hover:underline uppercase tracking-widest pl-2 transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Ver Detalle
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredStudents.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">
+                    No se encontraron estudiantes con esos criterios
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
 
       {/* Student Detail Modal (Emergency/Secretary View) */}
       {viewingStudent && (

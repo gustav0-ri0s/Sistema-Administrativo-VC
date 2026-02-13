@@ -1,6 +1,45 @@
 
 import { supabase } from './supabase';
-import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSummary, CourseAssignment, InstitutionalSettings } from '../types';
+import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSummary, CourseAssignment, InstitutionalSettings, RolePermission, UserRole } from '../types';
+
+
+export const rolePermissionService = {
+    async getAll() {
+        const { data, error } = await supabase
+            .from('role_permissions')
+            .select('*');
+
+        if (error) throw error;
+        return data as RolePermission[];
+    },
+
+    async update(role: UserRole, modules: string[]) {
+        const { data, error } = await supabase
+            .from('role_permissions')
+            .upsert({
+                role,
+                modules,
+                updated_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as RolePermission;
+    },
+
+    async getByRole(role: UserRole) {
+        const { data, error } = await supabase
+            .from('role_permissions')
+            .select('*')
+            .eq('role', role)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data as RolePermission | null;
+    }
+};
+
 
 export const profileService = {
     async getAll() {

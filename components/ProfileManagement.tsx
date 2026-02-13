@@ -3,347 +3,373 @@ import React, { useState } from 'react';
 import { Profile, UserRole, Assignment, Classroom } from '../types';
 import { profileService, classroomService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
-import { mockAssignments } from '../services/mockData';
-import { ROLE_ICONS, ROLE_LABELS } from '../constants';
-import { Search, Filter, Edit3, MoreVertical, X, UserPlus, Mail, CreditCard, User, Loader2, Phone, Key, Smartphone, UserCheck, Venus, Mars, RefreshCw, Calendar, Save, ShieldCheck, Eye, EyeOff, MapPin } from 'lucide-react';
+import {
+  Users, UserPlus, Search, Edit3, Trash2, MapPin,
+  Phone, Mail, Calendar as CalendarIcon, Shield,
+  CheckCircle2, XCircle, MoreVertical, Loader2,
+  X, Save, Eye, EyeOff, RefreshCw, Mars, Venus,
+  ShieldCheck, ArrowRight, UserCheck
+} from 'lucide-react';
 import { supabase } from '../services/supabase';
 import AssignmentPanel from './AssignmentPanel';
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  [UserRole.ADMIN]: 'Administrador',
+  [UserRole.SUBDIRECTOR]: 'Subdirector',
+  [UserRole.DOCENTE]: 'Docente',
+  [UserRole.AUXILIAR]: 'Auxiliar',
+  [UserRole.SECRETARIA]: 'Secretaria',
+  [UserRole.SUPERVISOR]: 'Supervisor'
+};
+
+const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
+  [UserRole.ADMIN]: <Shield className="w-5 h-5" />,
+  [UserRole.SUBDIRECTOR]: <ShieldCheck className="w-5 h-5" />,
+  [UserRole.DOCENTE]: <Users className="w-5 h-5" />,
+  [UserRole.AUXILIAR]: <UserCheck className="w-5 h-5" />,
+  [UserRole.SECRETARIA]: <Mail className="w-5 h-5" />,
+  [UserRole.SUPERVISOR]: <Search className="w-5 h-5" />
+};
+
+const mockAssignments: Assignment[] = [];
 
 const ProfileManagement: React.FC = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { showToast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('All');
+  const [isAddingProfile, setIsAddingProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
-  const [isAddingProfile, setIsAddingProfile] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
-  const [loadingDni, setLoadingDni] = useState<boolean>(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [loadingDni, setLoadingDni] = useState(false);
+  const [newProfile, setNewProfile] = useState<Partial<Profile>>({
+    role: UserRole.DOCENTE,
+    active: true,
+    force_password_change: true
+  });
+
+  const { showToast } = useToast();
 
   const handleDniLookup = async (dni: string, isEditing: boolean) => {
-    const cleanDni = dni.trim();
-    if (cleanDni.length !== 8) {
-      showToast('warning', 'El DNI debe tener 8 dígitos para realizar la consulta.', 'DNI Inválido');
-      return;
-    }
-
-    console.log('ProfileManagement: Starting DNI lookup for:', cleanDni);
+    if (!dni || dni.length < 8) return;
     setLoadingDni(true);
-
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('La consulta está demorando demasiado. Intente nuevamente.')), 15000)
-    );
-
     try {
-      if (!supabase) throw new Error('Cliente de Supabase no inicializado');
-
-      console.log('ProfileManagement: Invoking Edge Function for DNI:', cleanDni);
-
-      // Race the function call against the timeout
-      const result = await Promise.race([
-        supabase.functions.invoke('get-reniec-data', {
-          body: { dni: cleanDni }
-        }),
-        timeoutPromise
-      ]) as any;
-
-      if (!result) throw new Error('No se recibió respuesta del servidor.');
-
-      const { data, error } = result;
-
-      if (error) {
-        console.error('ProfileManagement: Edge Function error:', error);
-        throw error;
-      }
-
-      console.log('ProfileManagement: DNI lookup successfully completed');
-
-      if (data && data.normalized_full_name) {
-        if (isEditing) {
-          setEditingProfile(prev => prev ? { ...prev, full_name: data.normalized_full_name } : null);
+      const { data, error } = await supabase.functions.invoke('reniec-lookup', {
+        body: { dni }
+      });
+      if (error) throw error;
+      if (data?.nombres) {
+        const fullName = `${data.apellidoPaterno} ${data.apellidoMaterno}, ${data.nombres}`;
+        if (isEditing && editingProfile) {
+          setEditingProfile({ ...editingProfile, full_name: fullName });
         } else {
-          setNewProfile(prev => ({ ...prev, full_name: data.normalized_full_name }));
+          setNewProfile({ ...newProfile, full_name: fullName, dni });
         }
-        showToast('success', 'Datos recuperados exitosamente de RENIEC.', 'Consulta Exitosa');
-      } else {
-        showToast('error', 'No se encontraron datos para este DNI en los servidores de RENIEC.', 'Sin Resultados');
+        showToast('success', 'Datos autocompletados desde RENIEC');
       }
-    } catch (error: any) {
-      console.error('ProfileManagement: Error fetching DNI data:', error);
-      const errorMsg = error.message === 'Failed to fetch' ? 'Error de conexión con el servidor. Revisa tu internet.' : error.message;
-      showToast('error', `Error en consulta: ${errorMsg}`, 'Falla de Servicio');
+    } catch (err) {
+      console.error('DNI Lookup error:', err);
+      showToast('error', 'No se pudo encontrar el DNI');
     } finally {
-      console.log('ProfileManagement: Resetting loadingDni state');
       setLoadingDni(false);
     }
   };
 
-  React.useEffect(() => {
-    let isMounted = true;
-    const fetchData = async () => {
-      console.log('ProfileManagement: Starting fetchData...');
+  const fetchData = async () => {
+    try {
       setIsLoading(true);
-      try {
-        const [profilesData, classroomsData] = await Promise.all([
-          profileService.getAll(),
-          classroomService.getAll()
-        ]);
+      const [profilesData, classroomsData] = await Promise.all([
+        profileService.getAll(),
+        classroomService.getAll()
+      ]);
+      setProfiles(profilesData);
+      setClassrooms(classroomsData);
+    } catch (error) {
+      showToast('error', 'Error al cargar datos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        console.log('ProfileManagement: Data received:', profilesData?.length, 'profiles,', classroomsData?.length, 'classrooms');
-        if (isMounted) {
-          setProfiles(profilesData || []);
-          setClassrooms(classroomsData || []);
-        }
-      } catch (error) {
-        console.error('ProfileManagement: Error fetching data:', error);
-      } finally {
-        console.log('ProfileManagement: Fetch finished, setting isLoading to false');
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
+  React.useEffect(() => {
     fetchData();
-
-    // Safety timeout: force loading to stop after 6 seconds
-    const timeoutId = setTimeout(() => {
-      if (isLoading && isMounted) {
-        console.warn('ProfileManagement: Fetch timeout reached, forcing isLoading to false');
-        setIsLoading(false);
-      }
-    }, 6000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
   }, []);
 
-
-  // Fixed: Replaced 'status' with 'active' to match the Profile interface
-  const [newProfile, setNewProfile] = useState<Partial<Profile>>({
-    role: UserRole.DOCENTE,
-    active: true,
-    address: ''
-  });
-
-  const filteredProfiles = (profiles || []).filter(p => {
-    if (!p) return false;
-    const matchesSearch = (p.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.dni && p.dni.includes(searchTerm));
-    const matchesRole = roleFilter === 'All' || p.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
   const generateRandomPassword = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < 10; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setNewProfile({ ...newProfile, password });
   };
 
   const handleCreateProfile = async () => {
-    console.log('ProfileManagement: Attempting to create profile with Auth...', newProfile);
-    if (!newProfile.dni || !newProfile.full_name || !newProfile.email || !newProfile.password) {
-      showToast('warning', 'Por favor complete todos los campos obligatorios y genere una contraseña.', 'Datos Incompletos');
+    if (!newProfile.email || !newProfile.password || !newProfile.full_name) {
+      showToast('Por favor completa los campos requeridos', 'error');
       return;
     }
 
     try {
-      console.log('ProfileManagement: Calling adminCreateUser Edge Function...');
-      const { email, password, ...userData } = newProfile;
-      const result = await profileService.adminCreateUser(email!, password!, userData);
+      setIsUpdating(true);
+      console.log('ProfileManagement: Registering new user...', newProfile.email);
 
-      console.log('ProfileManagement: Creation successful!', result);
-      setProfiles([result.profile, ...profiles]);
-      setIsAddingProfile(false);
-      setNewProfile({ role: UserRole.DOCENTE, active: true, address: '' });
-      showToast('success', 'Personal registrado exitosamente con cuenta de acceso.', '¡Registro Exitoso!');
-    } catch (error: any) {
-      console.error('ProfileManagement: Error creating profile:', error);
-      showToast('error', `Error al registrar personal: ${error.message || 'Error desconocido'}`, 'Error de Registro');
-    }
-  };
+      const { password, ...rest } = newProfile;
 
-
-  const handleUpdateProfile = async () => {
-    console.log('ProfileManagement: Attempting to update profile...', editingProfile);
-    if (!editingProfile) return;
-
-    const { id, password, ...updates } = editingProfile;
-
-    // Soft validation: allow existing nulls but prevent empty strings for required fields if provided
-    if (!editingProfile.full_name || !editingProfile.email) {
-      console.warn('ProfileManagement: Update blocked - missing Name or Email');
-      showToast('warning', 'Nombre y Correo Institucional son obligatorios.', 'Campos Requeridos');
-      return;
-    }
-
-    setIsUpdating(true);
-    try {
-      let currentId = id;
-      // If a new password is provided, update it via Edge Function and include in DB update
-      if (password && password.trim() !== '') {
-        console.log('ProfileManagement: Updating password for profile ID:', id);
-        const repairResult = await profileService.adminUpdatePassword(id, password);
-
-        // If the Repair Sync migrated the ID, use the new one for the next database update
-        if (repairResult && repairResult.new_id) {
-          console.log('ProfileManagement: Repair Sync successful, NEW ID:', repairResult.new_id);
-          currentId = repairResult.new_id;
-          (updates as any).password = password;
-        } else {
-          (updates as any).password = password;
+      await profileService.adminCreateUser(
+        newProfile.email!,
+        password!,
+        {
+          full_name: newProfile.full_name!,
+          role: newProfile.role!,
+          active: true,
+          dni: newProfile.dni!,
+          force_password_change: newProfile.force_password_change || false
         }
-      }
+      );
 
-      console.log('ProfileManagement: Sending update to service for ID:', currentId, updates);
-      const updatedProfile = await profileService.update(currentId, updates);
-      console.log('ProfileManagement: Update successful!', updatedProfile);
-
-      // Update state: if the ID changed, replace the old profile entry with the new one
-      if (currentId !== id) {
-        setProfiles(profiles.map(p => p.id === id ? updatedProfile : p));
-      } else {
-        setProfiles(profiles.map(p => p.id === updatedProfile.id ? updatedProfile : p));
-      }
-
-      setEditingProfile(null);
-      showToast('success', 'Los cambios se han guardado correctamente.', 'Actualización Exitosa');
-
-      // Refresh local profile list
-      const freshProfiles = await profileService.getAll();
-      setProfiles(freshProfiles);
+      showToast('success', 'Personal registrado exitosamente');
+      setIsAddingProfile(false);
+      setNewProfile({ role: UserRole.DOCENTE, active: true, force_password_change: true });
+      fetchData();
     } catch (error: any) {
-      console.error('ProfileManagement: Error updating profile:', error);
-      showToast('error', `Error al actualizar: ${error.message || 'Error de red'}`, 'Error Crítico');
+      console.error('ProfileManagement: Create error:', error);
+      showToast('error', error.message || 'Error al crear perfil');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-10 h-10 text-[#57C5D5] animate-spin" />
-        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando Personal...</p>
-      </div>
-    );
-  }
+  const handleUpdateProfile = async () => {
+    if (!editingProfile) return;
+    try {
+      setIsUpdating(true);
+      console.log('ProfileManagement: Updating profile...', editingProfile.id);
+
+      // 1. Separate password from the rest of the profile updates
+      const { password, ...profileUpdates } = editingProfile;
+
+      // 2. If password is provided, update it via admin service
+      if (password && password.trim() !== '') {
+        console.log('ProfileManagement: Triggering password update via Edge Function');
+        await profileService.adminUpdatePassword(editingProfile.id, password);
+      }
+
+      // 3. Update the rest of the profile data (including force_password_change)
+      // Clean up the updates object to only include valid DB columns
+      const cleanUpdates = {
+        dni: profileUpdates.dni,
+        full_name: profileUpdates.full_name,
+        role: profileUpdates.role,
+        email: profileUpdates.email,
+        active: profileUpdates.active,
+        gender: profileUpdates.gender,
+        personal_email: profileUpdates.personal_email,
+        phone: profileUpdates.phone,
+        birth_date: profileUpdates.birth_date,
+        address: profileUpdates.address,
+        force_password_change: profileUpdates.force_password_change
+      };
+
+      console.log('ProfileManagement: Sending profile updates to DB:', cleanUpdates);
+      await profileService.update(editingProfile.id, cleanUpdates);
+
+      showToast('success', 'Perfil actualizado correctamente');
+      setEditingProfile(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('ProfileManagement: Update error:', error);
+      showToast('error', error.message || 'Error al actualizar perfil');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const filteredProfiles = profiles
+    .filter(p => {
+      const matchesSearch = p.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.dni?.includes(searchTerm);
+      const matchesRole = roleFilter === 'all' || p.role === roleFilter;
+      const matchesStatus = statusFilter === 'all' ||
+        (statusFilter === 'active' ? p.active : !p.active);
+      return matchesSearch && matchesRole && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Sort by active status first (true before false)
+      if (a.active !== b.active) {
+        return a.active ? -1 : 1;
+      }
+      // Then alphabetically by name
+      return a.full_name.localeCompare(b.full_name);
+    });
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Gestión de Personal</h2>
-          <p className="text-slate-500 text-sm">Administra el equipo docente y administrativo de la institución.</p>
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+            <Users className="w-8 h-8 text-[#57C5D5]" />
+            Gestión de Personal
+          </h2>
+          <p className="text-slate-500 text-sm font-medium">Administra los accesos y perfiles del sistema.</p>
         </div>
         <button
           onClick={() => setIsAddingProfile(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all active:scale-95"
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-[#57C5D5] text-white rounded-2xl font-bold text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all transform hover:scale-[1.02] active:scale-[0.98]"
         >
-          <UserPlus className="w-4 h-4" />
-          Nuevo Personal
+          <UserPlus className="w-5 h-5" />
+          Registrar Personal
         </button>
       </header>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar por DNI o Nombre..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#57C5D5] transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-[#718096]" />
-          <select
-            className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#57C5D5]"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            <option value="All">Todos los roles</option>
-            {Object.values(UserRole).map(role => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <aside className="lg:col-span-1 space-y-6">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Buscador</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="DNI, nombre o correo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-2 focus:ring-[#57C5D5]/20 outline-none"
+                />
+              </div>
+            </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">DNI / Email</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rol</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredProfiles.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
-                      {p.full_name?.charAt(0) || '?'}
-                    </div>
-                    <span className="font-semibold text-slate-800">{p.full_name || 'Nombre no registrado'}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <p className="text-sm font-medium text-slate-900">{p.dni}</p>
-                  <p className="text-xs text-slate-500">{p.email}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full w-fit">
-                    {ROLE_ICONS[p.role]}
-                    <span className="text-xs font-bold text-slate-600">{ROLE_LABELS[p.role]}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  {/* Fixed: Replaced 'status' with 'active' check */}
-                  <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${p.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                    {p.active ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2 transition-opacity">
-                    <button
-                      onClick={() => setViewingProfile(p)}
-                      className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-emerald-500 transition-all"
-                      title="Ver Reporte"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setEditingProfile({ ...p, password: '' })}
-                      className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-[#57C5D5] transition-all"
-                      title="Editar Datos"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-slate-600 transition-all">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar por Estado</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className={`flex-1 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${statusFilter === 'all' ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50'}`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setStatusFilter('active')}
+                  className={`flex-1 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${statusFilter === 'active' ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50'}`}
+                >
+                  Activos
+                </button>
+                <button
+                  onClick={() => setStatusFilter('inactive')}
+                  className={`flex-1 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${statusFilter === 'inactive' ? 'bg-red-500 text-white border-red-500 shadow-md' : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50'}`}
+                >
+                  Inactivos
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar por Rol</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setRoleFilter('all')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${roleFilter === 'all' ? 'bg-[#57C5D5] text-white border-[#57C5D5] shadow-md' : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50'}`}
+                >
+                  Todos
+                </button>
+                {Object.values(UserRole).map(role => (
+                  <button
+                    key={role}
+                    onClick={() => setRoleFilter(role)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${roleFilter === role ? 'bg-[#57C5D5] text-white border-[#57C5D5] shadow-md' : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50'}`}
+                  >
+                    {ROLE_LABELS[role]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <section className="lg:col-span-3">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[600px]">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Personal</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rol y Acceso</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center">
+                        <Loader2 className="w-8 h-8 text-[#57C5D5] animate-spin mx-auto mb-2" />
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando Personal...</p>
+                      </td>
+                    </tr>
+                  ) : filteredProfiles.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center">
+                        <p className="text-slate-400 font-medium">No se encontraron perfiles.</p>
+                      </td>
+                    </tr>
+                  ) : filteredProfiles.map((profile) => (
+                    <tr key={profile.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-2xl bg-[#57C5D5]/10 text-[#57C5D5] flex items-center justify-center font-black text-sm">
+                            {profile.full_name?.substring(0, 1).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 leading-none mb-1">{profile.full_name}</p>
+                            <p className="text-xs text-slate-400 font-medium">{profile.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 bg-slate-100 rounded-lg text-slate-500">
+                            {ROLE_ICONS[profile.role]}
+                          </span>
+                          <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">{ROLE_LABELS[profile.role]}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${profile.active ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                          {profile.active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                          {profile.active ? 'Activo' : 'Inactivo'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => setViewingProfile(profile)}
+                            className="p-2 text-slate-400 hover:text-[#57C5D5] hover:bg-[#57C5D5]/10 rounded-xl transition-all"
+                            title="Ver detalles"
+                          >
+                            <Search className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditingProfile({ ...profile, password: '' })}
+                            className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all"
+                            title="Editar"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
 
       {isAddingProfile && (
@@ -351,27 +377,25 @@ const ProfileManagement: React.FC = () => {
           <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
             <header className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#57C5D5] rounded-xl text-white">
-                  <UserPlus className="w-6 h-6" />
-                </div>
+                <div className="p-3 bg-[#57C5D5]/10 rounded-xl text-[#57C5D5]"><UserPlus className="w-6 h-6" /></div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900">Registrar Nuevo Personal</h3>
-                  <p className="text-sm text-slate-500">Completa los datos básicos para el alta.</p>
+                  <h3 className="text-xl font-bold text-slate-900">Registrar Personal</h3>
+                  <p className="text-sm text-slate-500 font-medium">Crea un nuevo acceso administrativo.</p>
                 </div>
               </div>
-              <button onClick={() => setIsAddingProfile(false)} className="p-2 text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
+              <button disabled={isUpdating} onClick={() => setIsAddingProfile(false)} className="p-2 text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
             </header>
             <div className="p-8 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">DNI (Obligatorio)</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">DNI</label>
                   <div className="relative group">
                     <input
                       type="text"
+                      maxLength={8}
                       value={newProfile.dni || ''}
                       onChange={(e) => setNewProfile({ ...newProfile, dni: e.target.value })}
-                      className="w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none transition-all"
-                      placeholder="8 dígitos"
+                      className="w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5] transition-all"
                     />
                     <button
                       type="button"
@@ -389,84 +413,22 @@ const ProfileManagement: React.FC = () => {
                     type="text"
                     value={newProfile.full_name || ''}
                     onChange={(e) => setNewProfile({ ...newProfile, full_name: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
-                    placeholder="Ej. Carlos Mendoza"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Institucional</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Institucional*</label>
                   <input
                     type="email"
+                    required
                     value={newProfile.email || ''}
                     onChange={(e) => setNewProfile({ ...newProfile, email: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
-                    placeholder="usuario@valores.edu.pe"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Personal</label>
-                  <input
-                    type="email"
-                    value={newProfile.personal_email || ''}
-                    onChange={(e) => setNewProfile({ ...newProfile, personal_email: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
-                    placeholder="ejemplo@gmail.com"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Celular</label>
-                  <input
-                    type="text"
-                    value={newProfile.phone || ''}
-                    onChange={(e) => setNewProfile({ ...newProfile, phone: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
-                    placeholder="999 999 999"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Fecha de Nacimiento</label>
-                  <input
-                    type="date"
-                    value={newProfile.birth_date || ''}
-                    onChange={(e) => setNewProfile({ ...newProfile, birth_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
-                  />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Dirección Domiciliaria</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-3 w-4 h-4 text-slate-300" />
-                    <input
-                      type="text"
-                      value={newProfile.address || ''}
-                      onChange={(e) => setNewProfile({ ...newProfile, address: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-[#57C5D5] outline-none"
-                      placeholder="Av. Las Lilas 123, Distrito"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Sexo</label>
+                <div className="space-y-1 relative">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Contraseña*</label>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewProfile({ ...newProfile, gender: 'M' })}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${newProfile.gender === 'M' ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5]' : 'border-slate-100 text-slate-500'}`}
-                    >
-                      <Mars className="w-4 h-4" /> Masculino
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewProfile({ ...newProfile, gender: 'F' })}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${newProfile.gender === 'F' ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5]' : 'border-slate-100 text-slate-500'}`}
-                    >
-                      <Venus className="w-4 h-4" /> Femenino
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Contraseña de Acceso</label>
-                  <div className="flex gap-2 relative">
                     <div className="relative flex-1">
                       <input
                         type={showNewPassword ? 'text' : 'password'}
@@ -492,6 +454,18 @@ const ProfileManagement: React.FC = () => {
                       <RefreshCw className="w-4 h-4" /> Generar
                     </button>
                   </div>
+                  <div className="mt-4 flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition-all hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      id="force_change_new"
+                      checked={newProfile.force_password_change || false}
+                      onChange={(e) => setNewProfile({ ...newProfile, force_password_change: e.target.checked })}
+                      className="w-5 h-5 rounded-lg border-slate-300 text-[#57C5D5] focus:ring-[#57C5D5] cursor-pointer"
+                    />
+                    <label htmlFor="force_change_new" className="text-sm font-bold text-slate-600 select-none cursor-pointer flex-1">
+                      Pedirle al usuario que cambie la contraseña cuando acceda
+                    </label>
+                  </div>
                 </div>
               </div>
               <div className="space-y-4">
@@ -514,8 +488,10 @@ const ProfileManagement: React.FC = () => {
               </div>
             </div>
             <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setIsAddingProfile(false)} className="px-6 py-2 text-sm font-bold text-slate-400">Cancelar</button>
-              <button onClick={handleCreateProfile} className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2]">Registrar Personal</button>
+              <button disabled={isUpdating} onClick={() => setIsAddingProfile(false)} className="px-6 py-2 text-sm font-bold text-slate-400">Cancelar</button>
+              <button disabled={isUpdating} onClick={handleCreateProfile} className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] flex items-center gap-2">
+                {isUpdating ? <><Loader2 className="w-4 h-4 animate-spin" /> Registrando...</> : 'Registrar Personal'}
+              </button>
             </footer>
           </div>
         </div>
@@ -529,7 +505,7 @@ const ProfileManagement: React.FC = () => {
                 <div className="p-3 bg-[#57C5D5]/10 rounded-xl text-[#57C5D5]">{ROLE_ICONS[editingProfile.role]}</div>
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">Editar: {editingProfile.full_name}</h3>
-                  <p className="text-sm text-slate-500">Modifica los datos del personal.</p>
+                  <p className="text-sm text-slate-500 font-medium">Modifica los datos del personal.</p>
                 </div>
               </div>
               <button onClick={() => setEditingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
@@ -614,15 +590,15 @@ const ProfileManagement: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-1 relative">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Cambio de Contraseña</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cambiar Contraseña</label>
                   <div className="relative">
                     <input
                       type={showEditPassword ? 'text' : 'password'}
                       value={editingProfile.password || ''}
                       onChange={(e) => setEditingProfile({ ...editingProfile, password: e.target.value })}
-                      placeholder="Dejar en blanco para no cambiar"
+                      placeholder="•••••••• (Protegida)"
                       autoComplete="new-password"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]/20 focus:border-[#57C5D5] transition-all pr-12"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]/20 focus:border-[#57C5D5] transition-all pr-12 font-mono"
                     />
                     <button
                       type="button"
@@ -631,6 +607,20 @@ const ProfileManagement: React.FC = () => {
                     >
                       {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
+                  </div>
+                  <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase italic">* Por seguridad, la clave actual está oculta. Solo escribe aquí si deseas cambiarla.</p>
+
+                  <div className="mt-4 flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition-all hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      id="force_change_edit"
+                      checked={editingProfile.force_password_change || false}
+                      onChange={(e) => setEditingProfile({ ...editingProfile, force_password_change: e.target.checked })}
+                      className="w-5 h-5 rounded-lg border-slate-300 text-[#57C5D5] focus:ring-[#57C5D5] cursor-pointer"
+                    />
+                    <label htmlFor="force_change_edit" className="text-sm font-bold text-slate-600 select-none cursor-pointer flex-1">
+                      Pedirle al usuario que cambie la contraseña cuando acceda
+                    </label>
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -696,8 +686,8 @@ const ProfileManagement: React.FC = () => {
                 profile={editingProfile}
                 classrooms={classrooms}
                 initialAssignments={mockAssignments.filter(a => a.profileId === editingProfile.id)}
-                onSave={(newAssignments) => {
-                  handleUpdateProfile();
+                onSave={async () => {
+                  await handleUpdateProfile();
                 }}
               />
 
@@ -725,120 +715,94 @@ const ProfileManagement: React.FC = () => {
           </div>
         </div>
       )}
+
       {viewingProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-            <header className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <header className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-                  <ShieldCheck className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-2xl bg-[#57C5D5]/10 text-[#57C5D5] flex items-center justify-center font-black text-lg">
+                  {viewingProfile.full_name?.substring(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900">Ficha de Personal</h3>
-                  <p className="text-sm text-slate-500">Vista de reporte institucional.</p>
+                  <h3 className="text-xl font-bold text-slate-900">{viewingProfile.full_name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="p-1 bg-slate-200 rounded text-slate-500 scale-75">
+                      {ROLE_ICONS[viewingProfile.role]}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ROLE_LABELS[viewingProfile.role]}</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Imprimir"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-                <button onClick={() => setViewingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
-              </div>
+              <button onClick={() => setViewingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600">
+                <X className="w-6 h-6" />
+              </button>
             </header>
-
-            <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto print:max-h-none">
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                <div className="w-32 h-32 rounded-3xl bg-slate-100 flex items-center justify-center text-4xl font-bold text-slate-300 border-4 border-white shadow-xl shrink-0">
-                  {viewingProfile.full_name?.charAt(0)}
-                </div>
-                <div className="space-y-4 flex-1 w-full">
-                  <div>
-                    <h2 className="text-3xl font-bold text-slate-900 leading-tight">{viewingProfile.full_name}</h2>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="px-3 py-1 bg-[#57C5D5]/10 text-[#57C5D5] rounded-full text-xs font-bold uppercase tracking-widest">{ROLE_LABELS[viewingProfile.role]}</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${viewingProfile.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {viewingProfile.active ? 'Activo' : 'Inactivo'}
-                      </span>
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Personal</p>
+                  <div className="space-y-3 mt-4">
+                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                      <Shield className="w-4 h-4 text-slate-300" />
+                      <span>DNI: {viewingProfile.dni || 'No registrado'}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                      <CalendarIcon className="w-4 h-4 text-slate-300" />
+                      <span>Nacimiento: {viewingProfile.birth_date || 'No registrado'}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                      <Mars className="w-4 h-4 text-slate-300" />
+                      <span>Sexo: {viewingProfile.gender === 'M' ? 'Masculino' : viewingProfile.gender === 'F' ? 'Femenino' : 'No especificado'}</span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-12 border-t border-slate-100 pt-6">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">DNI</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2 pr-4 border-r border-slate-50 last:border-0"><CreditCard className="w-4 h-4 text-slate-300" /> {viewingProfile.dni}</p>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contacto</p>
+                  <div className="space-y-3 mt-4">
+                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                      <Mail className="w-4 h-4 text-slate-300" />
+                      <span className="truncate" title={viewingProfile.email}>{viewingProfile.email}</span>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Correo Institucional</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2"><Mail className="w-4 h-4 text-slate-300" /> {viewingProfile.email}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Celular</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2"><Phone className="w-4 h-4 text-slate-300" /> {viewingProfile.phone || 'No registrado'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">F. Nacimiento</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-300" /> {viewingProfile.birth_date || 'No registrado'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Correo Personal</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2"><Mail className="w-4 h-4 text-slate-300" /> {viewingProfile.personal_email || 'No registrado'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Género</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2">
-                        {viewingProfile.gender === 'M' ? <Mars className="w-4 h-4 text-blue-300" /> : <Venus className="w-4 h-4 text-pink-300" />}
-                        {viewingProfile.gender === 'M' ? 'Masculino' : viewingProfile.gender === 'F' ? 'Femenino' : 'No especificado'}
-                      </p>
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dirección</label>
-                      <p className="text-slate-700 font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-slate-300" /> {viewingProfile.address || 'No registrado'}</p>
+                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                      <Phone className="w-4 h-4 text-slate-300" />
+                      <span>{viewingProfile.phone || 'Sin teléfono'}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Assignments in Report */}
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" /> Responsabilidades de Aula
-                </h4>
-                {mockAssignments.filter(a => a.profileId === viewingProfile.id).length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {mockAssignments.filter(a => a.profileId === viewingProfile.id).map((asg, idx) => {
-                      const room = classrooms.find(r => r.id === asg.classroomId);
-                      return (
-                        <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-slate-800">{room?.name || 'Aula desconocida'}</p>
-                            <p className="text-[10px] text-slate-400 uppercase">{room?.level} - {room?.grade} {room?.section}</p>
-                          </div>
-                          <div className="flex gap-1">
-                            {asg.canAttendance && <span className="p-1.5 bg-green-50 text-green-600 rounded-md text-[8px] font-bold uppercase">Asistencia</span>}
-                            {asg.canGrades && <span className="p-1.5 bg-blue-50 text-blue-600 rounded-md text-[8px] font-bold uppercase">Notas</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
+              <div className="space-y-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ubicación</p>
+                  <div className="mt-4 flex gap-3 text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <MapPin className="w-5 h-5 text-slate-300 shrink-0" />
+                    <span>{viewingProfile.address || 'Sin dirección registrada'}</span>
                   </div>
-                ) : (
-                  <div className="text-center py-4 bg-white rounded-xl border border-dashed border-slate-200">
-                    <p className="text-xs text-slate-400 font-medium">Sin asignaciones directas de aula.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asignaciones Académicas</p>
+                  <div className="mt-4 p-4 bg-[#57C5D5]/5 rounded-2xl border border-[#57C5D5]/10">
+                    <div className="flex items-center gap-3 text-sm font-bold text-[#57C5D5]">
+                      <ArrowRight className="w-4 h-4" />
+                      <span>0 Aulas Asignadas</span>
+                    </div>
+                    <p className="text-[10px] text-[#57C5D5]/60 mt-1 uppercase font-bold">Ver en panel de asignaciones</p>
                   </div>
-                )}
+                </div>
               </div>
             </div>
-
             <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
-                onClick={() => setViewingProfile(null)}
-                className="px-8 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95"
+                onClick={() => {
+                  setEditingProfile({ ...viewingProfile, password: '' });
+                  setViewingProfile(null);
+                }}
+                className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
               >
-                Cerrar Reporte
+                <Edit3 className="w-4 h-4" /> Editar Perfil
               </button>
             </footer>
           </div>

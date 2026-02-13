@@ -174,9 +174,9 @@ const ClassroomManager: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 text-left relative">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Configuración de Aulas</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Configuración de Aulas</h2>
           <p className="text-slate-500 text-sm">Gestiona los grados, secciones y capacidad de vacantes.</p>
         </div>
         <button
@@ -185,11 +185,12 @@ const ClassroomManager: React.FC = () => {
             setFormData({ name: '', level: 'Inicial', grade: '', section: '', capacity: 30, active: true });
             setShowForm(true);
           }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all"
         >
           <Plus className="w-4 h-4" /> Registrar Nueva Aula
         </button>
       </header>
+
 
       {/* MODAL FORM */}
       {showForm && (
@@ -269,20 +270,21 @@ const ClassroomManager: React.FC = () => {
               </div>
             </div>
 
-            <footer className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
+            <footer className="p-6 sm:p-8 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
               <button
                 onClick={() => setShowForm(false)}
-                className="px-8 py-3 text-sm font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all"
+                className="order-2 sm:order-1 px-8 py-3 text-sm font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-all"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateOrUpdate}
-                className="px-12 py-3.5 bg-[#57C5D5] text-white rounded-2xl font-black text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] hover:-translate-y-0.5 transition-all"
+                className="order-1 sm:order-2 px-12 py-3.5 bg-[#57C5D5] text-white rounded-2xl font-black text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] hover:-translate-y-0.5 transition-all"
               >
                 {editingId ? 'Guardar Cambios' : 'Confirmar Registro'}
               </button>
             </footer>
+
           </div>
         </div>
       )}

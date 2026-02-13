@@ -13,9 +13,12 @@ interface SidebarProps {
   onClose: () => void;
   onLogout?: () => void;
   currentUser: Profile | null;
+  userPermissions: string[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onClose, onLogout, currentUser }) => {
+
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onClose, onLogout, currentUser, userPermissions }) => {
+
   const { selectedYear, isYearReadOnly } = useAcademicYear();
   const [logoUrl, setLogoUrl] = React.useState('/image/logo.png');
 
@@ -36,8 +39,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
   if (!currentUser) return null;
 
   const filteredItems = NAVIGATION_ITEMS.filter(item =>
-    item.roles.includes(currentUser.role as UserRole)
+    userPermissions.includes(item.id)
   );
+
 
   // Determine if current year is read-only
   const isReadOnly = selectedYear ? isYearReadOnly(selectedYear) : false;

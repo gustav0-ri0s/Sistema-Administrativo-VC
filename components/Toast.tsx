@@ -58,7 +58,7 @@ export const Toast: React.FC<ToastProps> = ({ type, message, title, onClose }) =
         }
     };
 
-    const style = styles[type];
+    const style = styles[type] || styles.error;
     const Icon = style.icon;
 
     return (

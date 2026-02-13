@@ -129,18 +129,19 @@ const AcademicYearManager: React.FC<AcademicYearManagerProps> = ({ years: propsY
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <header className="flex flex-col md:flex-row items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Configuración de Ciclos Académicos</h2>
+      <header className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="text-center sm:text-left">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Configuración de Ciclos Académicos</h2>
           <p className="text-slate-500 text-sm">Control central de apertura de años, matrículas y periodos de evaluación.</p>
         </div>
         <button
           onClick={handleCreateYear}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all"
         >
           <Plus className="w-4 h-4" /> Aperturar Nuevo Ciclo
         </button>
       </header>
+
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {years.length === 0 && (

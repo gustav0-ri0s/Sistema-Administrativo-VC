@@ -45,6 +45,7 @@ export interface Profile {
   birth_date?: string;
   address?: string;
   password?: string;
+  force_password_change?: boolean;
 }
 
 // Added Assignment interface to fix missing member error
@@ -159,4 +160,10 @@ export interface AcademicYearContextType {
   isYearActive: (year: AcademicYear) => boolean;
   isYearReadOnly: (year: AcademicYear) => boolean;
   canEditBimestre: (bimestre: BimestreConfig, year: AcademicYear) => boolean;
+}
+
+export interface RolePermission {
+  role: UserRole;
+  modules: string[];
+  updated_at?: string;
 }

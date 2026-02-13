@@ -1,3 +1,4 @@
+
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -24,22 +25,24 @@ Deno.serve(async (req) => {
             }
         );
 
-        const { action, email, password, profile_id, userData } = await req.json();
+        const body = await req.json();
+        const { action, email, password, profile_id, userData } = body;
+
+        console.log(`Edge Function: Processing ${action} for ${email || profile_id}`);
 
         if (action === "create_user") {
-            // 1. Create user in Auth
             const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
                 email,
                 password,
                 email_confirm: true,
-                user_metadata: { full_name: userData.full_name },
+                user_metadata: { full_name: userData?.full_name },
             });
 
-            if (authError) throw authError;
+            if (authError) {
+                console.error("Edge Function: Auth error", authError);
+                throw authError;
+            }
 
-            // 2. Profile row is usually created via trigger or manually. 
-            // In this case, we'll return the auth ID so the client can create the profile row with that ID.
-            // Or we can create it here to ensure atomicity.
             const { data: profileData, error: profileError } = await supabaseAdmin
                 .from("profiles")
                 .insert([
@@ -52,7 +55,10 @@ Deno.serve(async (req) => {
                 .select()
                 .single();
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.error("Edge Function: DB error", profileError);
+                throw profileError;
+            }
 
             return new Response(JSON.stringify({ user: authData.user, profile: profileData }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -61,14 +67,18 @@ Deno.serve(async (req) => {
         }
 
         if (action === "update_password") {
-            const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+            console.log(`Edge Function: Updating password for ${profile_id}`);
+            const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
                 profile_id,
                 { password }
             );
 
-            if (updateError) throw updateError;
+            if (updateError) {
+                console.error("Edge Function: Password update error", updateError);
+                throw updateError;
+            }
 
-            return new Response(JSON.stringify({ message: "Password updated successfully" }), {
+            return new Response(JSON.stringify({ message: "Password updated successfully", data: updateData }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });
@@ -79,8 +89,9 @@ Deno.serve(async (req) => {
             status: 400,
         });
 
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+    } catch (error: any) {
+        console.error("Edge Function: Global error", error);
+        return new Response(JSON.stringify({ error: error.message || "Unknown error" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 500,
         });

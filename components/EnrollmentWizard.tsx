@@ -222,48 +222,50 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
-      <div className="bg-white border-b-4 border-[#57C5D5] rounded-3xl p-6 shadow-xl shadow-[#57C5D5]/5 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
+      <div className="bg-white border-b-4 border-[#57C5D5] rounded-3xl p-4 sm:p-6 shadow-xl shadow-[#57C5D5]/5 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4 w-full md:w-auto">
           <div className="p-3 bg-[#57C5D5]/10 rounded-2xl text-[#57C5D5]">
-            <CalendarRange className="w-8 h-8" />
+            <CalendarRange className="w-6 h-6 sm:w-8 h-8" />
           </div>
           <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Periodo de Matrícula</h2>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">I.E.P. Valores y Ciencias</p>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Periodo de Matrícula</h2>
+            <p className="text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">I.E.P. Valores y Ciencias</p>
           </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 w-full md:w-auto">
           {openYears.map(y => (
             <button
               key={y.year}
               onClick={() => setSelectedYear(y.year)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition-all border-2 ${selectedYear === y.year
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-2xl font-bold transition-all border-2 text-xs sm:text-sm ${selectedYear === y.year
                 ? 'bg-[#57C5D5] text-white border-[#57C5D5] shadow-lg shadow-[#57C5D5]/20'
                 : 'bg-white text-slate-400 border-slate-100 hover:border-[#57C5D5]/30'
                 }`}
             >
-              {selectedYear === y.year && <CheckCircle className="w-4 h-4" />}
-              Año Lectivo {y.year}
+              {selectedYear === y.year && <CheckCircle className="w-3 h-3 sm:w-4 h-4" />}
+              Año {y.year}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-8 px-12">
+
+      <div className="flex items-center justify-between mb-8 px-4 sm:px-12">
         {[1, 2, 3].map((s) => (
           <React.Fragment key={s}>
             <div className="flex flex-col items-center gap-2 relative z-10">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${step >= s ? 'bg-[#57C5D5] text-white ring-4 ring-[#57C5D5]/10' : 'bg-slate-200 text-slate-500'}`}>
-                {step > s ? <CheckCircle2 className="w-6 h-6" /> : s}
+              <div className={`w-8 h-8 sm:w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 ${step >= s ? 'bg-[#57C5D5] text-white ring-4 ring-[#57C5D5]/10' : 'bg-slate-200 text-slate-500'}`}>
+                {step > s ? <CheckCircle2 className="w-5 h-5 sm:w-6 h-6" /> : s}
               </div>
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${step >= s ? 'text-[#57C5D5]' : 'text-slate-400'}`}>
+              <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider ${step >= s ? 'text-[#57C5D5]' : 'text-slate-400'}`}>
                 {s === 1 ? 'Estudiante' : s === 2 ? 'Familia' : 'Finalizar'}
               </span>
             </div>
-            {s < 3 && <div className={`flex-1 h-1 mx-4 rounded-full transition-all duration-500 ${step > s ? 'bg-[#57C5D5]' : 'bg-slate-200'}`} />}
+            {s < 3 && <div className={`flex-1 h-0.5 sm:h-1 mx-2 sm:mx-4 rounded-full transition-all duration-500 ${step > s ? 'bg-[#57C5D5]' : 'bg-slate-200'}`} />}
           </React.Fragment>
         ))}
       </div>
+
 
       <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
         <div className="p-10">
@@ -405,16 +407,17 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
                 </div>
               )}
 
-              <footer className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center mt-10">
-                <button onClick={prevStep} disabled={step === 1} className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-800 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Anterior</button>
+              <footer className="p-6 sm:p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center mt-6 sm:mt-10">
+                <button onClick={prevStep} disabled={step === 1} className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-400 hover:text-slate-800 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Anterior</button>
                 <button
                   disabled={!selectedYear || !formData.dni || isValidating || isSubmitting}
                   onClick={step < 3 ? handleNext : handleSubmit}
-                  className={`flex items-center gap-2 px-10 py-3 rounded-2xl font-bold text-sm shadow-xl transition-all ${step < 3 ? 'bg-[#57C5D5] text-white' : 'bg-emerald-600 text-white'} disabled:opacity-50`}
+                  className={`flex items-center gap-2 px-6 sm:px-10 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm shadow-xl transition-all ${step < 3 ? 'bg-[#57C5D5] text-white' : 'bg-emerald-600 text-white'} disabled:opacity-50`}
                 >
-                  {isSubmitting ? <>Procesando... <Loader2 className="w-4 h-4 animate-spin" /></> : isValidating ? <>Validando... <Loader2 className="w-4 h-4 animate-spin" /></> : <>{step < 3 ? 'Siguiente Paso' : 'Confirmar Matrícula'} <ChevronRight className="w-4 h-4" /></>}
+                  {isSubmitting ? <>Procesando... <Loader2 className="w-4 h-4 animate-spin" /></> : isValidating ? <>Validando... <Loader2 className="w-4 h-4 animate-spin" /></> : <>{step < 3 ? 'Siguiente' : 'Confirmar Matrícula'} <ChevronRight className="w-4 h-4" /></>}
                 </button>
               </footer>
+
             </>
           )}
         </div>

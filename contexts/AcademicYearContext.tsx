@@ -15,7 +15,7 @@ export const AcademicYearProvider: React.FC<AcademicYearProviderProps> = ({ chil
     const [isLoading, setIsLoading] = useState(true);
 
     // Fetch years from database
-    const refreshYears = async () => {
+    const refreshYears = React.useCallback(async () => {
         try {
             console.log('AcademicYearContext: Fetching years...');
             const years = await academicService.getYears();
@@ -24,24 +24,26 @@ export const AcademicYearProvider: React.FC<AcademicYearProviderProps> = ({ chil
 
             console.log('AcademicYearContext: Data ready, processing selection...');
             // Auto-select active year or first year
-            if (!selectedYear || !years.find(y => y.id === selectedYear.id)) {
-                const activeYear = years.find(y => y.is_active);
-                const yearToSelect = activeYear || years[0] || null;
-                console.log('AcademicYearContext: Auto-selecting year:', yearToSelect?.year);
-                setSelectedYear(yearToSelect);
-            } else {
-                // Update selected year with fresh data
-                const updatedSelectedYear = years.find(y => y.id === selectedYear.id);
-                if (updatedSelectedYear) {
-                    setSelectedYear(updatedSelectedYear);
+            setSelectedYear(prev => {
+                if (!prev || !years.find(y => y.id === prev.id)) {
+                    const activeYear = years.find(y => y.is_active);
+                    const yearToSelect = activeYear || years[0] || null;
+                    console.log('AcademicYearContext: Auto-selecting year:', yearToSelect?.year);
+                    return yearToSelect;
+                } else {
+                    // Update selected year with fresh data
+                    const updatedSelectedYear = years.find(y => y.id === prev.id);
+                    return updatedSelectedYear || prev;
                 }
-            }
+            });
         } catch (error) {
             console.error('AcademicYearContext: Error fetching years:', error);
+            // Even on error, we must stop loading to let the app show its login/main screen
+            setIsLoading(false);
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
 
     // Initial load
     useEffect(() => {
@@ -62,7 +64,7 @@ export const AcademicYearProvider: React.FC<AcademicYearProviderProps> = ({ chil
         return validation.canEdit;
     };
 
-    const value: AcademicYearContextType = {
+    const value: AcademicYearContextType = React.useMemo(() => ({
         selectedYear,
         setSelectedYear,
         academicYears,
@@ -71,26 +73,16 @@ export const AcademicYearProvider: React.FC<AcademicYearProviderProps> = ({ chil
         isYearActive,
         isYearReadOnly,
         canEditBimestre
-    };
+    }), [selectedYear, academicYears, refreshYears]);
 
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="text-center space-y-4">
-                    <div className="w-16 h-16 border-4 border-[#57C5D5] border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-                        Cargando Sistema Académico...
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
+    // We removed the blocking isLoading check here to prevent the "double loading" screen.
+    // The App component handles the main system loading UI.
     return (
         <AcademicYearContext.Provider value={value}>
             {children}
         </AcademicYearContext.Provider>
     );
+
 };
 
 // Custom hook to use the context

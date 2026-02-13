@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { AcademicYear, IncidentSummary, Classroom } from '../types';
-import { mockProfiles, mockIncidents as fallbackIncidents } from '../services/mockData';
 import { academicService, incidentService, profileService, studentService, classroomService } from '../services/database.service';
 
 import { useAcademicYear } from '../contexts/AcademicYearContext';
@@ -35,13 +34,12 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           classroomService.getAll()
         ]);
 
-        if (recent && recent.length > 0) {
+        if (recent) {
           setActiveIncidents(recent);
-        } else {
-          setActiveIncidents(fallbackIncidents);
         }
 
         if (stats) setIncidentStats(stats);
+
         if (typeof staff === 'number') setStaffCount(staff);
         if (classroomsData) setClassrooms(classroomsData);
 
@@ -51,7 +49,6 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
         }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
-        setActiveIncidents(fallbackIncidents);
       } finally {
         setIsLoading(false);
       }
@@ -103,10 +100,10 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
         </div>
       )}
 
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 text-left uppercase tracking-tight">Panel Administrativo {selectedYear?.year}</h2>
-          <div className="flex items-center gap-2 mt-1">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900 text-left uppercase tracking-tight">Panel Administrativo {selectedYear?.year}</h2>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : isPlanning ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200'
               }`}>
               Estado: {selectedYear?.status}
@@ -116,6 +113,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
             </p>}
           </div>
         </div>
+
 
         <div className="hidden md:flex items-center gap-3">
           <div className="text-right">
@@ -234,7 +232,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
                 <Loader2 className="w-4 h-4 animate-spin text-[#57C5D5]" />
                 Cargando incidencias...
               </div>
-            ) : (
+            ) : activeIncidents.length > 0 ? (
               activeIncidents.map(inc => {
                 const getStatusStyle = (status: string) => {
                   const normalized = status.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -252,7 +250,6 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
                 const formatDate = (dateString: string) => {
                   try {
                     const date = new Date(dateString);
-                    // Format: DD/MM/YYYY HH:MM
                     return new Intl.DateTimeFormat('es-PE', {
                       day: '2-digit',
                       month: '2-digit',
@@ -287,6 +284,13 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
                   </div>
                 );
               })
+            ) : (
+              <div className="p-10 text-center space-y-3">
+                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-5 h-5 text-slate-300" />
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No se registraron incidentes recientes</p>
+              </div>
             )}
           </div>
         </div>
