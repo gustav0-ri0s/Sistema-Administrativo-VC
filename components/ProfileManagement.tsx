@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Profile, UserRole, Assignment, Classroom } from '../types';
-import { profileService, classroomService } from '../services/database.service';
+import { profileService, classroomService, courseAssignmentService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
 import {
   Users, UserPlus, Search, Edit3, Trash2, MapPin,
@@ -31,10 +31,11 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   [UserRole.SUPERVISOR]: <Search className="w-5 h-5" />
 };
 
-const mockAssignments: Assignment[] = [];
+
 
 const ProfileManagement: React.FC = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [courseAssignments, setCourseAssignments] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingProfile, setIsAddingProfile] = useState(false);
@@ -83,12 +84,14 @@ const ProfileManagement: React.FC = () => {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [profilesData, classroomsData] = await Promise.all([
+      const [profilesData, classroomsData, assignmentsData] = await Promise.all([
         profileService.getAll(),
-        classroomService.getAll()
+        classroomService.getAll(),
+        courseAssignmentService.getAll()
       ]);
       setProfiles(profilesData);
       setClassrooms(classroomsData);
+      setCourseAssignments(assignmentsData);
     } catch (error) {
       showToast('error', 'Error al cargar datos');
     } finally {
@@ -685,7 +688,21 @@ const ProfileManagement: React.FC = () => {
               <AssignmentPanel
                 profile={editingProfile}
                 classrooms={classrooms}
-                initialAssignments={mockAssignments.filter(a => a.profileId === editingProfile.id)}
+                initialAssignments={classrooms.map(c => {
+                  const hasAssignment = courseAssignments.some(ca =>
+                    ca.profileId === editingProfile.id && ca.classroomId === c.id
+                  );
+
+                  if (hasAssignment) {
+                    return {
+                      profileId: editingProfile.id,
+                      classroomId: c.id,
+                      canAttendance: true,
+                      canGrades: true
+                    };
+                  }
+                  return null;
+                }).filter(Boolean) as Assignment[]}
                 onSave={async () => {
                   await handleUpdateProfile();
                 }}
