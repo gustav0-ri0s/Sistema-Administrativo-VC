@@ -699,22 +699,61 @@ const ProfileManagement: React.FC = () => {
                 profile={editingProfile}
                 classrooms={classrooms}
                 initialAssignments={classrooms.map(c => {
-                  const hasAssignment = courseAssignments.some(ca =>
+                  // Buscar asignaciones del sistema de asistencia (course_assignments con user_id)
+                  // que solo marcan asistencia
+                  const hasAttendanceAssignment = courseAssignments.some(ca =>
                     ca.profileId === editingProfile.id && ca.classroomId === c.id
                   );
 
-                  if (hasAssignment) {
+                  if (hasAttendanceAssignment) {
                     return {
                       profileId: editingProfile.id,
                       classroomId: c.id,
-                      canAttendance: true,
-                      canGrades: true
+                      canAttendance: true,  // Marcado por el sistema de asistencia
+                      canGrades: false      // No se marca automáticamente
                     };
                   }
                   return null;
                 }).filter(Boolean) as Assignment[]}
-                onSave={async () => {
-                  await handleUpdateProfile();
+                onSave={async (newAssignments: Assignment[]) => {
+                  try {
+                    // 1. Eliminar asignaciones antiguas del usuario
+                    const oldAssignments = courseAssignments.filter(ca =>
+                      ca.profileId === editingProfile.id
+                    );
+
+                    for (const old of oldAssignments) {
+                      await courseAssignmentService.delete(old.id);
+                    }
+
+                    // 2. Crear nuevas asignaciones solo para "Asistencia" marcada
+                    // La tabla usa profile_id (no user_id)
+                    const assignmentsToCreate = newAssignments
+                      .filter(a => a.canAttendance) // Solo crear si tiene permiso de asistencia
+                      .map(a => ({
+                        profile_id: editingProfile.id,
+                        classroom_id: parseInt(a.classroomId)
+                      }));
+
+                    if (assignmentsToCreate.length > 0) {
+                      const { error } = await supabase
+                        .from('course_assignments')
+                        .insert(assignmentsToCreate);
+
+                      if (error) throw error;
+                    }
+
+                    // 3. Actualizar el perfil
+                    await handleUpdateProfile();
+
+                    // 4. Recargar datos
+                    await fetchData();
+
+                    showToast('success', 'Asignaciones guardadas correctamente');
+                  } catch (error: any) {
+                    console.error('Error guardando asignaciones:', error);
+                    showToast('error', 'Error al guardar asignaciones: ' + error.message);
+                  }
                 }}
               />
 

@@ -163,10 +163,10 @@ export const courseAssignmentService = {
         if (error) throw error;
         return (data || []).map((d: any) => ({
             id: d.id.toString(),
-            courseId: d.area_id.toString(),
+            courseId: d.area_id?.toString() || '',
             profileId: d.profile_id,
             classroomId: d.classroom_id.toString(),
-            hoursPerWeek: d.hours_per_week
+            hoursPerWeek: d.hours_per_week || 0
         })) as CourseAssignment[];
     },
 
@@ -512,6 +512,7 @@ export const classroomService = {
 
         return data.map(item => ({
             ...item,
+            id: item.id.toString(),
             enrolled: (item.students as any[])?.length || 0,
             active: item.active ?? true
         })) as Classroom[];
