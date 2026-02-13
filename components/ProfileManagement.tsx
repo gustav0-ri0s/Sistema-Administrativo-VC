@@ -84,16 +84,26 @@ const ProfileManagement: React.FC = () => {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [profilesData, classroomsData, assignmentsData] = await Promise.all([
-        profileService.getAll(),
-        classroomService.getAll(),
-        courseAssignmentService.getAll()
-      ]);
+
+      console.log('Fetching profiles...');
+      const profilesData = await profileService.getAll().catch(e => { console.error('Error fetching profiles:', e); throw e; });
+
+      console.log('Fetching classrooms...');
+      const classroomsData = await classroomService.getAll().catch(e => { console.error('Error fetching classrooms:', e); throw e; });
+
+      console.log('Fetching assignments...');
+      // Allow assignments to fail gracefully if table doesn't exist yet, returning empty array
+      const assignmentsData = await courseAssignmentService.getAll().catch(e => {
+        console.error('Error fetching course assignments:', e);
+        return [];
+      });
+
       setProfiles(profilesData);
       setClassrooms(classroomsData);
       setCourseAssignments(assignmentsData);
     } catch (error) {
-      showToast('error', 'Error al cargar datos');
+      console.error('Main fetchData error:', error);
+      showToast('error', 'Error al cargar datos: ' + (error as Error).message);
     } finally {
       setIsLoading(false);
     }

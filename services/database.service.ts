@@ -161,7 +161,7 @@ export const courseAssignmentService = {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return data.map((d: any) => ({
+        return (data || []).map((d: any) => ({
             id: d.id.toString(),
             courseId: d.area_id.toString(),
             profileId: d.profile_id,
