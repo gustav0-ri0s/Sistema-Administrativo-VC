@@ -6,43 +6,59 @@ import { Check, ShieldCheck, Info } from 'lucide-react';
 interface AssignmentPanelProps {
   profile: Profile;
   classrooms: Classroom[];
-  onSave: (assignments: Assignment[]) => void;
-  initialAssignments: Assignment[];
+  assignments: Assignment[];
+  onChange: (assignments: Assignment[]) => void;
 }
 
-const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, classrooms, onSave, initialAssignments }) => {
-  const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
-
+const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, classrooms, assignments, onChange }) => {
   const isSupervisoryRole = profile.role === UserRole.SUBDIRECTOR || profile.role === UserRole.ADMIN;
 
-  const toggleAssignment = (classroomId: string, field: 'canAttendance' | 'canGrades') => {
+  const toggleAssignment = (classroomId: string, field: 'canAttendance' | 'canGrades' | 'isTutor') => {
     const existingIndex = assignments.findIndex(a => a.classroomId === classroomId);
 
-    if (existingIndex > -1) {
-      const newAssignments = [...assignments];
-      newAssignments[existingIndex] = {
-        ...newAssignments[existingIndex],
-        [field]: !newAssignments[existingIndex][field]
-      };
-      if (!newAssignments[existingIndex].canAttendance && !newAssignments[existingIndex].canGrades) {
-        newAssignments.splice(existingIndex, 1);
+    let nextAssignments: Assignment[] = [...assignments];
+
+    if (field === 'isTutor') {
+      // Logic for single tutor: toggle off tutor status for all other classrooms
+      nextAssignments = assignments.map(a => ({
+        ...a,
+        isTutor: a.classroomId === classroomId ? !a.isTutor : false
+      }));
+
+      // If classroom was not in assignments but is being marked as tutor, add it
+      if (existingIndex === -1) {
+        nextAssignments.push({
+          profileId: profile.id,
+          classroomId,
+          canAttendance: false,
+          canGrades: false,
+          isTutor: true
+        });
       }
-      setAssignments(newAssignments);
     } else {
-      setAssignments([
-        ...assignments,
-        {
+      if (existingIndex > -1) {
+        nextAssignments[existingIndex] = {
+          ...nextAssignments[existingIndex],
+          [field]: !nextAssignments[existingIndex][field]
+        };
+      } else {
+        nextAssignments.push({
           profileId: profile.id,
           classroomId,
           canAttendance: field === 'canAttendance',
-          canGrades: field === 'canGrades'
-        }
-      ]);
+          canGrades: field === 'canGrades',
+          isTutor: false
+        });
+      }
     }
+
+    // Filter out assignments that have no flags set
+    const filtered = nextAssignments.filter(a => a.canAttendance || a.canGrades || a.isTutor);
+    onChange(filtered);
   };
 
   const getAssignment = (classroomId: string) => {
-    return assignments.find(a => a.classroomId === classroomId) || { canAttendance: false, canGrades: false };
+    return assignments.find(a => a.classroomId === classroomId) || { canAttendance: false, canGrades: false, isTutor: false };
   };
 
   if (isSupervisoryRole) {
@@ -61,23 +77,15 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, classrooms, 
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">Asignación de Salones</h3>
-          <p className="text-sm text-slate-500">Define las responsabilidades de {profile.full_name}.</p>
-        </div>
-        <button
-          onClick={() => onSave(assignments)}
-          className="px-6 py-2 bg-[#57C5D5] text-white rounded-xl text-sm font-bold hover:bg-[#46b3c2] transition-all shadow-lg shadow-[#57C5D5]/20"
-        >
-          Guardar Asignaciones
-        </button>
+      <div>
+        <h3 className="text-lg font-bold text-slate-900">Asignación de Salones</h3>
+        <p className="text-sm text-slate-500">Define las responsabilidades de {profile.full_name}.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {classrooms.map((room) => {
           const current = getAssignment(room.id);
-          const hasSome = current.canAttendance || current.canGrades;
+          const hasSome = current.canAttendance || current.canGrades || current.isTutor;
           return (
             <div key={room.id} className={`p-4 rounded-2xl border-2 transition-all ${hasSome ? 'border-[#57C5D5] bg-white ring-4 ring-[#57C5D5]/5' : 'border-slate-100 bg-slate-50 opacity-80'
               }`}>
@@ -89,7 +97,7 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, classrooms, 
                 {hasSome && <Check className="w-5 h-5 text-[#57C5D5]" />}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
@@ -107,6 +115,15 @@ const AssignmentPanel: React.FC<AssignmentPanelProps> = ({ profile, classrooms, 
                     className="w-4 h-4 rounded text-[#57C5D5] border-slate-300 focus:ring-[#57C5D5]"
                   />
                   <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">Notas</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={current.isTutor}
+                    onChange={() => toggleAssignment(room.id, 'isTutor')}
+                    className="w-4 h-4 rounded text-amber-500 border-slate-300 focus:ring-amber-500"
+                  />
+                  <span className={`text-xs font-bold group-hover:text-slate-900 ${current.isTutor ? 'text-amber-600' : 'text-slate-600'}`}>Tutor</span>
                 </label>
               </div>
             </div>

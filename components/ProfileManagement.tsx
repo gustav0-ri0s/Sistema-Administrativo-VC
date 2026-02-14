@@ -40,6 +40,7 @@ const ProfileManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingProfile, setIsAddingProfile] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [editingAssignments, setEditingAssignments] = useState<Assignment[]>([]);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -113,6 +114,33 @@ const ProfileManagement: React.FC = () => {
     fetchData();
   }, []);
 
+  const openEditProfile = (profile: Profile) => {
+    setEditingProfile({ ...profile, password: '' });
+
+    // Initialize assignments based on current data
+    const initialAssignments = classrooms.map(c => {
+      const isRoomTutor = profile.is_tutor &&
+        profile.tutor_classroom_id?.toString() === c.id.toString();
+
+      const attendanceAssignment = courseAssignments.find(ca =>
+        ca.profileId === profile.id && ca.classroomId === c.id
+      );
+
+      if (attendanceAssignment || isRoomTutor) {
+        return {
+          profileId: profile.id,
+          classroomId: c.id,
+          canAttendance: !!attendanceAssignment,
+          canGrades: false,
+          isTutor: !!isRoomTutor
+        };
+      }
+      return null;
+    }).filter(Boolean) as Assignment[];
+
+    setEditingAssignments(initialAssignments);
+  };
+
   const generateRandomPassword = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
     let password = "";
@@ -162,19 +190,41 @@ const ProfileManagement: React.FC = () => {
     if (!editingProfile) return;
     try {
       setIsUpdating(true);
-      console.log('ProfileManagement: Updating profile...', editingProfile.id);
+      console.log('ProfileManagement: Starting consolidated update...', editingProfile.id);
 
       // 1. Separate password from the rest of the profile updates
       const { password, ...profileUpdates } = editingProfile;
 
       // 2. If password is provided, update it via admin service
       if (password && password.trim() !== '') {
-        console.log('ProfileManagement: Triggering password update via Edge Function');
+        console.log('ProfileManagement: Triggering password update');
         await profileService.adminUpdatePassword(editingProfile.id, password);
       }
 
-      // 3. Update the rest of the profile data (including force_password_change)
-      // Clean up the updates object to only include valid DB columns
+      // 3. Update Course Assignments (attendance system)
+      console.log('ProfileManagement: Updating course assignments...');
+      // Delete old
+      const oldAssignments = courseAssignments.filter(ca => ca.profileId === editingProfile.id);
+      for (const old of oldAssignments) {
+        await courseAssignmentService.delete(old.id);
+      }
+      // Insert new
+      const attendanceToCreate = editingAssignments
+        .filter(a => a.canAttendance)
+        .map(a => ({
+          profile_id: editingProfile.id,
+          classroom_id: parseInt(a.classroomId)
+        }));
+
+      if (attendanceToCreate.length > 0) {
+        const { error: assignError } = await supabase
+          .from('course_assignments')
+          .insert(attendanceToCreate);
+        if (assignError) throw assignError;
+      }
+
+      // 4. Update Profile (including tutor fields)
+      const tutorAssignment = editingAssignments.find(a => a.isTutor);
       const cleanUpdates = {
         dni: profileUpdates.dni,
         full_name: profileUpdates.full_name,
@@ -186,17 +236,20 @@ const ProfileManagement: React.FC = () => {
         phone: profileUpdates.phone,
         birth_date: profileUpdates.birth_date,
         address: profileUpdates.address,
-        force_password_change: profileUpdates.force_password_change
+        force_password_change: profileUpdates.force_password_change,
+        is_tutor: !!tutorAssignment,
+        tutor_classroom_id: tutorAssignment ? parseInt(tutorAssignment.classroomId) : null
       };
 
       console.log('ProfileManagement: Sending profile updates to DB:', cleanUpdates);
       await profileService.update(editingProfile.id, cleanUpdates);
 
-      showToast('success', 'Perfil actualizado correctamente');
+      showToast('success', 'Perfil y asignaciones actualizados correctamente');
       setEditingProfile(null);
+      setEditingAssignments([]);
       fetchData();
     } catch (error: any) {
-      console.error('ProfileManagement: Update error:', error);
+      console.error('ProfileManagement: Consolidated update error:', error);
       showToast('error', error.message || 'Error al actualizar perfil');
     } finally {
       setIsUpdating(false);
@@ -368,7 +421,7 @@ const ProfileManagement: React.FC = () => {
                             <Search className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => setEditingProfile({ ...profile, password: '' })}
+                            onClick={() => openEditProfile(profile)}
                             className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all"
                             title="Editar"
                           >
@@ -698,63 +751,8 @@ const ProfileManagement: React.FC = () => {
               <AssignmentPanel
                 profile={editingProfile}
                 classrooms={classrooms}
-                initialAssignments={classrooms.map(c => {
-                  // Buscar asignaciones del sistema de asistencia (course_assignments con user_id)
-                  // que solo marcan asistencia
-                  const hasAttendanceAssignment = courseAssignments.some(ca =>
-                    ca.profileId === editingProfile.id && ca.classroomId === c.id
-                  );
-
-                  if (hasAttendanceAssignment) {
-                    return {
-                      profileId: editingProfile.id,
-                      classroomId: c.id,
-                      canAttendance: true,  // Marcado por el sistema de asistencia
-                      canGrades: false      // No se marca automáticamente
-                    };
-                  }
-                  return null;
-                }).filter(Boolean) as Assignment[]}
-                onSave={async (newAssignments: Assignment[]) => {
-                  try {
-                    // 1. Eliminar asignaciones antiguas del usuario
-                    const oldAssignments = courseAssignments.filter(ca =>
-                      ca.profileId === editingProfile.id
-                    );
-
-                    for (const old of oldAssignments) {
-                      await courseAssignmentService.delete(old.id);
-                    }
-
-                    // 2. Crear nuevas asignaciones solo para "Asistencia" marcada
-                    // La tabla usa profile_id (no user_id)
-                    const assignmentsToCreate = newAssignments
-                      .filter(a => a.canAttendance) // Solo crear si tiene permiso de asistencia
-                      .map(a => ({
-                        profile_id: editingProfile.id,
-                        classroom_id: parseInt(a.classroomId)
-                      }));
-
-                    if (assignmentsToCreate.length > 0) {
-                      const { error } = await supabase
-                        .from('course_assignments')
-                        .insert(assignmentsToCreate);
-
-                      if (error) throw error;
-                    }
-
-                    // 3. Actualizar el perfil
-                    await handleUpdateProfile();
-
-                    // 4. Recargar datos
-                    await fetchData();
-
-                    showToast('success', 'Asignaciones guardadas correctamente');
-                  } catch (error: any) {
-                    console.error('Error guardando asignaciones:', error);
-                    showToast('error', 'Error al guardar asignaciones: ' + error.message);
-                  }
-                }}
+                assignments={editingAssignments}
+                onChange={setEditingAssignments}
               />
 
             </div>
@@ -863,7 +861,7 @@ const ProfileManagement: React.FC = () => {
             <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => {
-                  setEditingProfile({ ...viewingProfile, password: '' });
+                  openEditProfile(viewingProfile);
                   setViewingProfile(null);
                 }}
                 className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"

@@ -46,6 +46,8 @@ export interface Profile {
   address?: string;
   password?: string;
   force_password_change?: boolean;
+  is_tutor?: boolean;
+  tutor_classroom_id?: string | number | null;
 }
 
 // Added Assignment interface to fix missing member error
@@ -54,6 +56,7 @@ export interface Assignment {
   classroomId: string;
   canAttendance: boolean;
   canGrades: boolean;
+  isTutor?: boolean;
 }
 
 export interface Classroom {

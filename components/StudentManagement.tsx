@@ -41,11 +41,15 @@ const StudentManagement: React.FC = () => {
     academic_status: AcademicStatus.ACTIVO
   });
 
-  const filteredStudents = students.filter(s =>
-    s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.dni && s.dni.includes(searchTerm))
-  );
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.dni && s.dni.includes(searchTerm));
+
+    const matchesYear = !selectedYear || s.academic_year_id === selectedYear.id;
+
+    return matchesSearch && matchesYear;
+  });
 
   const handleEditClick = (student: Student) => {
     setEditingStudent(student);
