@@ -91,6 +91,7 @@ export interface CourseAssignment {
   profileId: string;
   classroomId: string;
   hoursPerWeek: number;
+  academicYearId?: number;
 }
 
 export interface BimestreConfig {

@@ -154,11 +154,17 @@ export const profileService = {
 };
 
 export const courseAssignmentService = {
-    async getAll() {
-        const { data, error } = await supabase
+    async getAll(academicYearId?: number) {
+        let query = supabase
             .from('course_assignments')
             .select('*')
             .order('created_at', { ascending: false });
+
+        if (academicYearId) {
+            query = query.eq('academic_year_id', academicYearId);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         return (data || []).map((d: any) => ({
@@ -166,16 +172,18 @@ export const courseAssignmentService = {
             courseId: d.area_id?.toString() || '',
             profileId: d.profile_id,
             classroomId: d.classroom_id.toString(),
-            hoursPerWeek: d.hours_per_week || 0
+            hoursPerWeek: d.hours_per_week || 0,
+            academicYearId: d.academic_year_id
         })) as CourseAssignment[];
     },
 
-    async createBulk(assignments: Omit<CourseAssignment, 'id'>[]) {
+    async createBulk(assignments: Omit<CourseAssignment, 'id'>[], academicYearId?: number) {
         const dbData = assignments.map(a => ({
             area_id: parseInt(a.courseId),
             profile_id: a.profileId,
             classroom_id: parseInt(a.classroomId),
-            hours_per_week: a.hoursPerWeek
+            hours_per_week: a.hoursPerWeek,
+            ...(academicYearId ? { academic_year_id: academicYearId } : {})
         }));
 
         const { data, error } = await supabase

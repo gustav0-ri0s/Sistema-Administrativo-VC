@@ -2,10 +2,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CourseAssignment, Classroom, CurricularArea, Profile } from '../types';
 import { classroomService, profileService, curricularAreaService, courseAssignmentService } from '../services/database.service';
+import { useAcademicYear } from '../contexts/AcademicYearContext';
 import { useToast } from '../contexts/ToastContext';
-import { ClipboardList, Plus, User, Book, MapPin, Trash2, Clock, Loader2, CheckSquare, Square, CheckCircle2, Search, X, Check, Filter, ChevronRight, ChevronLeft, Calendar } from 'lucide-react';
+import { ClipboardList, Plus, User, Book, MapPin, Trash2, Clock, Loader2, CheckSquare, Square, CheckCircle2, Search, X, Check, Filter, ChevronRight, ChevronLeft, Calendar, Eye } from 'lucide-react';
 
 const CourseAssignmentMatrix: React.FC = () => {
+  const { selectedYear, isYearReadOnly } = useAcademicYear();
   const [assignments, setAssignments] = useState<CourseAssignment[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [docentes, setDocentes] = useState<Profile[]>([]);
@@ -30,10 +32,11 @@ const CourseAssignmentMatrix: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   const { showToast } = useToast();
+  const readOnly = selectedYear ? isYearReadOnly(selectedYear) : false;
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedYear?.id]);
 
   const loadData = async () => {
     try {
@@ -42,7 +45,7 @@ const CourseAssignmentMatrix: React.FC = () => {
         classroomService.getAll(),
         profileService.getTeachers(),
         curricularAreaService.getAll(),
-        courseAssignmentService.getAll()
+        courseAssignmentService.getAll(selectedYear?.id)
       ]);
       setClassrooms(cData);
       setDocentes(dData);
@@ -146,7 +149,7 @@ const CourseAssignmentMatrix: React.FC = () => {
       });
 
       if (newAssignments.length > 0) {
-        await courseAssignmentService.createBulk(newAssignments);
+        await courseAssignmentService.createBulk(newAssignments, selectedYear?.id);
       }
 
       // Update Tutor Status
@@ -229,17 +232,40 @@ const CourseAssignmentMatrix: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 text-left pb-20">
+      {/* Read-Only Banner */}
+      {readOnly && (
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 flex items-center gap-3 animate-in slide-in-from-top-2">
+          <Eye className="w-5 h-5 text-amber-600" />
+          <div>
+            <p className="text-sm font-bold text-amber-900">Modo Solo Lectura — Ciclo {selectedYear?.year}</p>
+            <p className="text-xs text-amber-700">Este año académico está cerrado. Los datos son de solo consulta.</p>
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Carga Horaria Docente</h2>
-          <p className="text-slate-500 text-sm font-medium">Gestión administrativa de la estructura académica.</p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-slate-500 text-sm font-medium">Gestión administrativa de la estructura académica.</p>
+            {selectedYear && (
+              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${selectedYear.is_active
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                  : 'bg-slate-50 text-slate-400 border-slate-200'
+                }`}>
+                Ciclo {selectedYear.year}
+              </span>
+            )}
+          </div>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-8 py-4 bg-[#57C5D5] text-white rounded-2xl text-sm font-black shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all transform hover:-translate-y-1"
-        >
-          <Plus className="w-5 h-5" /> Registrar Carga
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-8 py-4 bg-[#57C5D5] text-white rounded-2xl text-sm font-black shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all transform hover:-translate-y-1"
+          >
+            <Plus className="w-5 h-5" /> Registrar Carga
+          </button>
+        )}
       </header>
 
       {/* MULTI-STEP MODAL */}
