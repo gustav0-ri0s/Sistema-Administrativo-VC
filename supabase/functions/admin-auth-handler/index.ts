@@ -43,13 +43,19 @@ Deno.serve(async (req) => {
                 throw authError;
             }
 
+            // Sanitize userData: Convert empty strings to null (fixes date errors)
+            const sanitizedData = { ...userData };
+            Object.keys(sanitizedData).forEach(key => {
+                if (sanitizedData[key] === "") sanitizedData[key] = null;
+            });
+
             const { data: profileData, error: profileError } = await supabaseAdmin
                 .from("profiles")
-                .insert([
+                .upsert([
                     {
                         id: authData.user.id,
                         email,
-                        ...userData,
+                        ...sanitizedData,
                     },
                 ])
                 .select()

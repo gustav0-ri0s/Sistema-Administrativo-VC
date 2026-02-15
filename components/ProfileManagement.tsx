@@ -61,22 +61,36 @@ const ProfileManagement: React.FC = () => {
     if (!dni || dni.length < 8) return;
     setLoadingDni(true);
     try {
-      const { data, error } = await supabase.functions.invoke('reniec-lookup', {
-        body: { dni }
+      // Direct client-side call using provided token
+      const token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImluZm9ybWF0aWNhQG11aXZjLmNvbSJ9.-7aIyu38iAr_3UA35brkHskYK_Jmrq0C9BeGeqB8t6M';
+      const response = await fetch(`https://dniruc.apisperu.com/api/v1/dni/${dni}?token=${token}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
       });
-      if (error) throw error;
-      if (data?.nombres) {
-        const fullName = `${data.apellidoPaterno} ${data.apellidoMaterno}, ${data.nombres}`;
+
+      if (!response.ok) {
+        throw new Error(`Error ApisPeru: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data?.success && data?.nombres) {
+        const fullName = `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`;
         if (isEditing && editingProfile) {
           setEditingProfile({ ...editingProfile, full_name: fullName });
         } else {
           setNewProfile({ ...newProfile, full_name: fullName, dni });
         }
-        showToast('success', 'Datos autocompletados desde RENIEC');
+        showToast('success', 'Datos autocompletados desde RENIEC (ApisPeru)');
+      } else {
+        throw new Error('No se encontraron datos para este DNI.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('DNI Lookup error:', err);
-      showToast('error', 'No se pudo encontrar el DNI');
+      const msg = err?.message || 'Error desconocido';
+      showToast('error', `Error: ${msg}`, 'Búsqueda DNI');
     } finally {
       setLoadingDni(false);
     }
@@ -131,7 +145,7 @@ const ProfileManagement: React.FC = () => {
           profileId: profile.id,
           classroomId: c.id,
           canAttendance: !!attendanceAssignment,
-          canGrades: false,
+          canGrades: !!attendanceAssignment,
           isTutor: !!isRoomTutor
         };
       }
@@ -163,14 +177,18 @@ const ProfileManagement: React.FC = () => {
       const { password, ...rest } = newProfile;
 
       await profileService.adminCreateUser(
-        newProfile.email!,
+        newProfile.email!.trim(),
         password!,
         {
           full_name: newProfile.full_name!,
           role: newProfile.role!,
           active: true,
           dni: newProfile.dni!,
-          force_password_change: newProfile.force_password_change || false
+          force_password_change: newProfile.force_password_change || false,
+          phone: newProfile.phone,
+          address: newProfile.address,
+          gender: newProfile.gender,
+          birth_date: newProfile.birth_date
         }
       );
 
@@ -203,24 +221,36 @@ const ProfileManagement: React.FC = () => {
 
       // 3. Update Course Assignments (attendance system)
       console.log('ProfileManagement: Updating course assignments...');
-      // Delete old
+      // Smart update to preserve area_id and hours_per_week
       const oldAssignments = courseAssignments.filter(ca => ca.profileId === editingProfile.id);
-      for (const old of oldAssignments) {
-        await courseAssignmentService.delete(old.id);
-      }
-      // Insert new
-      const attendanceToCreate = editingAssignments
-        .filter(a => a.canAttendance)
-        .map(a => ({
-          profile_id: editingProfile.id,
-          classroom_id: parseInt(a.classroomId)
-        }));
 
-      if (attendanceToCreate.length > 0) {
-        const { error: assignError } = await supabase
-          .from('course_assignments')
-          .insert(attendanceToCreate);
-        if (assignError) throw assignError;
+      for (const classroom of classrooms) {
+        const classroomIdStr = classroom.id.toString();
+
+        // Check DB state
+        const existingRows = oldAssignments.filter(old => old.classroomId.toString() === classroomIdStr);
+
+        // Check UI state
+        // UI only tracks changes for assignments in editingAssignments, but we iterate all classrooms to be safe
+        const uiState = editingAssignments.find(a => a.classroomId.toString() === classroomIdStr);
+        const wantsAccess = uiState ? (uiState.canAttendance || uiState.canGrades) : false;
+
+        if (wantsAccess && existingRows.length === 0) {
+          // Grant access (Generic assignment)
+          const { error: insertError } = await supabase
+            .from('course_assignments')
+            .insert({
+              profile_id: editingProfile.id,
+              classroom_id: parseInt(classroomIdStr)
+            });
+          if (insertError) throw insertError;
+        } else if (!wantsAccess && existingRows.length > 0) {
+          // Revoke access (Delete all rows for this classroom)
+          for (const old of existingRows) {
+            await courseAssignmentService.delete(old.id);
+          }
+        }
+        // If wantsAccess && exists -> Do nothing (Preserve detailed assignment)
       }
 
       // 4. Update Profile (including tutor fields)
@@ -482,15 +512,80 @@ const ProfileManagement: React.FC = () => {
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                   />
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Fecha de Nacimiento</label>
+                  <div className="relative">
+                    <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="date"
+                      value={newProfile.birth_date || ''}
+                      onChange={(e) => setNewProfile({ ...newProfile, birth_date: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none text-slate-600 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Sexo</label>
+                  <div className="flex gap-2">
+                    {['M', 'F'].map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setNewProfile({ ...newProfile, gender: g })}
+                        className={`flex-1 py-2.5 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 ${newProfile.gender === g
+                          ? 'bg-slate-800 text-white border-slate-800 shadow-lg shadow-slate-800/20'
+                          : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                      >
+                        {g === 'M' ? <Mars className="w-3 h-3" /> : <Venus className="w-3 h-3" />}
+                        {g === 'M' ? 'Masculino' : 'Femenino'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Teléfono / Celular</label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      value={newProfile.phone || ''}
+                      onChange={(e) => setNewProfile({ ...newProfile, phone: e.target.value })}
+                      placeholder="999 999 999"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none placeholder:text-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Dirección de Domicilio</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={newProfile.address || ''}
+                      onChange={(e) => setNewProfile({ ...newProfile, address: e.target.value })}
+                      placeholder="Av. Principal 123..."
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none placeholder:text-slate-300"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Institucional*</label>
-                  <input
-                    type="email"
-                    required
-                    value={newProfile.email || ''}
-                    onChange={(e) => setNewProfile({ ...newProfile, email: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-                  />
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      value={newProfile.email || ''}
+                      onChange={(e) => setNewProfile({ ...newProfile, email: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1 relative">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Contraseña*</label>
@@ -561,318 +656,323 @@ const ProfileManagement: React.FC = () => {
             </footer>
           </div>
         </div>
-      )}
+      )
+      }
 
-      {editingProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-300">
-            <header className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#57C5D5]/10 rounded-xl text-[#57C5D5]">{ROLE_ICONS[editingProfile.role]}</div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">Editar: {editingProfile.full_name}</h3>
-                  <p className="text-sm text-slate-500 font-medium">Modifica los datos del personal.</p>
+      {
+        editingProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-300">
+              <header className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-[#57C5D5]/10 rounded-xl text-[#57C5D5]">{ROLE_ICONS[editingProfile.role]}</div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Editar: {editingProfile.full_name}</h3>
+                    <p className="text-sm text-slate-500 font-medium">Modifica los datos del personal.</p>
+                  </div>
                 </div>
-              </div>
-              <button onClick={() => setEditingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
-            </header>
-            <div className="flex-1 overflow-y-auto p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">DNI</label>
-                  <div className="relative group">
+                <button onClick={() => setEditingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
+              </header>
+              <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">DNI</label>
+                    <div className="relative group">
+                      <input
+                        type="text"
+                        value={editingProfile.dni || ''}
+                        onChange={(e) => setEditingProfile({ ...editingProfile, dni: e.target.value })}
+                        className="w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5] transition-all"
+                      />
+                      <button
+                        type="button"
+                        disabled={loadingDni}
+                        onClick={() => handleDniLookup(editingProfile.dni || '', true)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-[#57C5D5] text-white rounded-lg shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-colors disabled:opacity-50"
+                      >
+                        {loadingDni ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Nombre Completo</label>
                     <input
                       type="text"
-                      value={editingProfile.dni || ''}
-                      onChange={(e) => setEditingProfile({ ...editingProfile, dni: e.target.value })}
-                      className="w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5] transition-all"
+                      value={editingProfile.full_name || ''}
+                      onChange={(e) => setEditingProfile({ ...editingProfile, full_name: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                     />
-                    <button
-                      type="button"
-                      disabled={loadingDni}
-                      onClick={() => handleDniLookup(editingProfile.dni || '', true)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-[#57C5D5] text-white rounded-lg shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-colors disabled:opacity-50"
-                    >
-                      {loadingDni ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    </button>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Nombre Completo</label>
-                  <input
-                    type="text"
-                    value={editingProfile.full_name || ''}
-                    onChange={(e) => setEditingProfile({ ...editingProfile, full_name: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Institucional</label>
-                  <input
-                    type="email"
-                    value={editingProfile.email || ''}
-                    onChange={(e) => setEditingProfile({ ...editingProfile, email: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Personal</label>
-                  <input
-                    type="email"
-                    value={editingProfile.personal_email || ''}
-                    onChange={(e) => setEditingProfile({ ...editingProfile, personal_email: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Celular</label>
-                  <input
-                    type="text"
-                    value={editingProfile.phone || ''}
-                    onChange={(e) => setEditingProfile({ ...editingProfile, phone: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Fecha de Nacimiento</label>
-                  <input
-                    type="date"
-                    value={editingProfile.birth_date || ''}
-                    onChange={(e) => setEditingProfile({ ...editingProfile, birth_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
-                  />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Dirección Domiciliaria</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-3 w-4 h-4 text-slate-300" />
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Institucional</label>
+                    <input
+                      type="email"
+                      value={editingProfile.email || ''}
+                      onChange={(e) => setEditingProfile({ ...editingProfile, email: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Personal</label>
+                    <input
+                      type="email"
+                      value={editingProfile.personal_email || ''}
+                      onChange={(e) => setEditingProfile({ ...editingProfile, personal_email: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Celular</label>
                     <input
                       type="text"
-                      value={editingProfile.address || ''}
-                      onChange={(e) => setEditingProfile({ ...editingProfile, address: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]"
-                      placeholder="Av. Las Lilas 123, Distrito"
+                      value={editingProfile.phone || ''}
+                      onChange={(e) => setEditingProfile({ ...editingProfile, phone: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                     />
                   </div>
-                </div>
-                <div className="space-y-1 relative">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cambiar Contraseña</label>
-                  <div className="relative">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Fecha de Nacimiento</label>
                     <input
-                      type={showEditPassword ? 'text' : 'password'}
-                      value={editingProfile.password || ''}
-                      onChange={(e) => setEditingProfile({ ...editingProfile, password: e.target.value })}
-                      placeholder="•••••••• (Protegida)"
-                      autoComplete="new-password"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]/20 focus:border-[#57C5D5] transition-all pr-12 font-mono"
+                      type="date"
+                      value={editingProfile.birth_date || ''}
+                      onChange={(e) => setEditingProfile({ ...editingProfile, birth_date: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowEditPassword(!showEditPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
-                  <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase italic">* Por seguridad, la clave actual está oculta. Solo escribe aquí si deseas cambiarla.</p>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Dirección Domiciliaria</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-4 top-3 w-4 h-4 text-slate-300" />
+                      <input
+                        type="text"
+                        value={editingProfile.address || ''}
+                        onChange={(e) => setEditingProfile({ ...editingProfile, address: e.target.value })}
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                        placeholder="Av. Las Lilas 123, Distrito"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1 relative">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cambiar Contraseña</label>
+                    <div className="relative">
+                      <input
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editingProfile.password || ''}
+                        onChange={(e) => setEditingProfile({ ...editingProfile, password: e.target.value })}
+                        placeholder="•••••••• (Protegida)"
+                        autoComplete="new-password"
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#57C5D5]/20 focus:border-[#57C5D5] transition-all pr-12 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase italic">* Por seguridad, la clave actual está oculta. Solo escribe aquí si deseas cambiarla.</p>
 
-                  <div className="mt-4 flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition-all hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      id="force_change_edit"
-                      checked={editingProfile.force_password_change || false}
-                      onChange={(e) => setEditingProfile({ ...editingProfile, force_password_change: e.target.checked })}
-                      className="w-5 h-5 rounded-lg border-slate-300 text-[#57C5D5] focus:ring-[#57C5D5] cursor-pointer"
-                    />
-                    <label htmlFor="force_change_edit" className="text-sm font-bold text-slate-600 select-none cursor-pointer flex-1">
-                      Pedirle al usuario que cambie la contraseña cuando acceda
-                    </label>
+                    <div className="mt-4 flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition-all hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        id="force_change_edit"
+                        checked={editingProfile.force_password_change || false}
+                        onChange={(e) => setEditingProfile({ ...editingProfile, force_password_change: e.target.checked })}
+                        className="w-5 h-5 rounded-lg border-slate-300 text-[#57C5D5] focus:ring-[#57C5D5] cursor-pointer"
+                      />
+                      <label htmlFor="force_change_edit" className="text-sm font-bold text-slate-600 select-none cursor-pointer flex-1">
+                        Pedirle al usuario que cambie la contraseña cuando acceda
+                      </label>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Estado</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingProfile({ ...editingProfile, active: true })}
+                        className={`flex-1 py-2.5 rounded-xl border-2 transition-all ${editingProfile.active ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-100 text-slate-500'}`}
+                      >
+                        Activo
+                      </button>
+                      <button
+                        onClick={() => setEditingProfile({ ...editingProfile, active: false })}
+                        className={`flex-1 py-2.5 rounded-xl border-2 transition-all ${!editingProfile.active ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-100 text-slate-500'}`}
+                      >
+                        Inactivo
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Sexo</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingProfile({ ...editingProfile, gender: 'M' })}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${editingProfile.gender === 'M' ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5]' : 'border-slate-100 text-slate-500'}`}
+                      >
+                        <Mars className="w-4 h-4" /> Masculino
+                      </button>
+                      <button
+                        onClick={() => setEditingProfile({ ...editingProfile, gender: 'F' })}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${editingProfile.gender === 'F' ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5]' : 'border-slate-100 text-slate-500'}`}
+                      >
+                        <Venus className="w-4 h-4" /> Femenino
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Estado</label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingProfile({ ...editingProfile, active: true })}
-                      className={`flex-1 py-2.5 rounded-xl border-2 transition-all ${editingProfile.active ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-100 text-slate-500'}`}
-                    >
-                      Activo
-                    </button>
-                    <button
-                      onClick={() => setEditingProfile({ ...editingProfile, active: false })}
-                      className={`flex-1 py-2.5 rounded-xl border-2 transition-all ${!editingProfile.active ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-100 text-slate-500'}`}
-                    >
-                      Inactivo
-                    </button>
+
+                <section className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-[#57C5D5]" /> Nivel de Acceso y Rol
+                    </h4>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Sexo</label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingProfile({ ...editingProfile, gender: 'M' })}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${editingProfile.gender === 'M' ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5]' : 'border-slate-100 text-slate-500'}`}
-                    >
-                      <Mars className="w-4 h-4" /> Masculino
-                    </button>
-                    <button
-                      onClick={() => setEditingProfile({ ...editingProfile, gender: 'F' })}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${editingProfile.gender === 'F' ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5]' : 'border-slate-100 text-slate-500'}`}
-                    >
-                      <Venus className="w-4 h-4" /> Femenino
-                    </button>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {Object.values(UserRole).map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => setEditingProfile({ ...editingProfile, role })}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${editingProfile.role === role
+                          ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5] ring-2 ring-[#57C5D5]/20'
+                          : 'border-white bg-white hover:border-slate-200 text-slate-600'
+                          }`}
+                      >
+                        {ROLE_ICONS[role]}
+                        <span className="text-xs font-bold">{ROLE_LABELS[role]}</span>
+                      </button>
+                    ))}
                   </div>
-                </div>
+                </section>
+
+                <AssignmentPanel
+                  profile={editingProfile}
+                  classrooms={classrooms}
+                  assignments={editingAssignments}
+                  onChange={setEditingAssignments}
+                />
+
               </div>
-
-              <section className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#57C5D5]" /> Nivel de Acceso y Rol
-                  </h4>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {Object.values(UserRole).map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => setEditingProfile({ ...editingProfile, role })}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${editingProfile.role === role
-                        ? 'border-[#57C5D5] bg-[#57C5D5]/5 text-[#57C5D5] ring-2 ring-[#57C5D5]/20'
-                        : 'border-white bg-white hover:border-slate-200 text-slate-600'
-                        }`}
-                    >
-                      {ROLE_ICONS[role]}
-                      <span className="text-xs font-bold">{ROLE_LABELS[role]}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <AssignmentPanel
-                profile={editingProfile}
-                classrooms={classrooms}
-                assignments={editingAssignments}
-                onChange={setEditingAssignments}
-              />
-
+              <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button onClick={() => setEditingProfile(null)} className="px-6 py-2 text-sm font-bold text-slate-400" disabled={isUpdating}>Cancelar</button>
+                <button
+                  onClick={handleUpdateProfile}
+                  disabled={isUpdating}
+                  className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Guardar Cambios
+                    </>
+                  )}
+                </button>
+              </footer>
             </div>
-            <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setEditingProfile(null)} className="px-6 py-2 text-sm font-bold text-slate-400" disabled={isUpdating}>Cancelar</button>
-              <button
-                onClick={handleUpdateProfile}
-                disabled={isUpdating}
-                className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm shadow-xl shadow-[#57C5D5]/20 hover:bg-[#46b3c2] flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isUpdating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Actualizando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Guardar Cambios
-                  </>
-                )}
-              </button>
-            </footer>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {viewingProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-            <header className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#57C5D5]/10 text-[#57C5D5] flex items-center justify-center font-black text-lg">
-                  {viewingProfile.full_name?.substring(0, 1).toUpperCase()}
+      {
+        viewingProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+              <header className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#57C5D5]/10 text-[#57C5D5] flex items-center justify-center font-black text-lg">
+                    {viewingProfile.full_name?.substring(0, 1).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">{viewingProfile.full_name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="p-1 bg-slate-200 rounded text-slate-500 scale-75">
+                        {ROLE_ICONS[viewingProfile.role]}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ROLE_LABELS[viewingProfile.role]}</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">{viewingProfile.full_name}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="p-1 bg-slate-200 rounded text-slate-500 scale-75">
-                      {ROLE_ICONS[viewingProfile.role]}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ROLE_LABELS[viewingProfile.role]}</span>
+                <button onClick={() => setViewingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </header>
+              <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Personal</p>
+                    <div className="space-y-3 mt-4">
+                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                        <Shield className="w-4 h-4 text-slate-300" />
+                        <span>DNI: {viewingProfile.dni || 'No registrado'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                        <CalendarIcon className="w-4 h-4 text-slate-300" />
+                        <span>Nacimiento: {viewingProfile.birth_date || 'No registrado'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                        <Mars className="w-4 h-4 text-slate-300" />
+                        <span>Sexo: {viewingProfile.gender === 'M' ? 'Masculino' : viewingProfile.gender === 'F' ? 'Femenino' : 'No especificado'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contacto</p>
+                    <div className="space-y-3 mt-4">
+                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                        <Mail className="w-4 h-4 text-slate-300" />
+                        <span className="truncate" title={viewingProfile.email}>{viewingProfile.email}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                        <Phone className="w-4 h-4 text-slate-300" />
+                        <span>{viewingProfile.phone || 'Sin teléfono'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ubicación</p>
+                    <div className="mt-4 flex gap-3 text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <MapPin className="w-5 h-5 text-slate-300 shrink-0" />
+                      <span>{viewingProfile.address || 'Sin dirección registrada'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asignaciones Académicas</p>
+                    <div className="mt-4 p-4 bg-[#57C5D5]/5 rounded-2xl border border-[#57C5D5]/10">
+                      <div className="flex items-center gap-3 text-sm font-bold text-[#57C5D5]">
+                        <ArrowRight className="w-4 h-4" />
+                        <span>0 Aulas Asignadas</span>
+                      </div>
+                      <p className="text-[10px] text-[#57C5D5]/60 mt-1 uppercase font-bold">Ver en panel de asignaciones</p>
+                    </div>
                   </div>
                 </div>
               </div>
-              <button onClick={() => setViewingProfile(null)} className="p-2 text-slate-400 hover:text-slate-600">
-                <X className="w-6 h-6" />
-              </button>
-            </header>
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Información Personal</p>
-                  <div className="space-y-3 mt-4">
-                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                      <Shield className="w-4 h-4 text-slate-300" />
-                      <span>DNI: {viewingProfile.dni || 'No registrado'}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                      <CalendarIcon className="w-4 h-4 text-slate-300" />
-                      <span>Nacimiento: {viewingProfile.birth_date || 'No registrado'}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                      <Mars className="w-4 h-4 text-slate-300" />
-                      <span>Sexo: {viewingProfile.gender === 'M' ? 'Masculino' : viewingProfile.gender === 'F' ? 'Femenino' : 'No especificado'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contacto</p>
-                  <div className="space-y-3 mt-4">
-                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                      <Mail className="w-4 h-4 text-slate-300" />
-                      <span className="truncate" title={viewingProfile.email}>{viewingProfile.email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                      <Phone className="w-4 h-4 text-slate-300" />
-                      <span>{viewingProfile.phone || 'Sin teléfono'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ubicación</p>
-                  <div className="mt-4 flex gap-3 text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <MapPin className="w-5 h-5 text-slate-300 shrink-0" />
-                    <span>{viewingProfile.address || 'Sin dirección registrada'}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asignaciones Académicas</p>
-                  <div className="mt-4 p-4 bg-[#57C5D5]/5 rounded-2xl border border-[#57C5D5]/10">
-                    <div className="flex items-center gap-3 text-sm font-bold text-[#57C5D5]">
-                      <ArrowRight className="w-4 h-4" />
-                      <span>0 Aulas Asignadas</span>
-                    </div>
-                    <p className="text-[10px] text-[#57C5D5]/60 mt-1 uppercase font-bold">Ver en panel de asignaciones</p>
-                  </div>
-                </div>
-              </div>
+              <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => {
+                    openEditProfile(viewingProfile);
+                    setViewingProfile(null);
+                  }}
+                  className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
+                >
+                  <Edit3 className="w-4 h-4" /> Editar Perfil
+                </button>
+              </footer>
             </div>
-            <footer className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => {
-                  openEditProfile(viewingProfile);
-                  setViewingProfile(null);
-                }}
-                className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
-              >
-                <Edit3 className="w-4 h-4" /> Editar Perfil
-              </button>
-            </footer>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

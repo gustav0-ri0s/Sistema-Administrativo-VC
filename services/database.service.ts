@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Profile, Student, AcademicYear, Classroom, CurricularArea, IncidentSummary, CourseAssignment, InstitutionalSettings, RolePermission, UserRole } from '../types';
+import { Profile, Student, AcademicYear, Classroom, CurricularArea, Competency, IncidentSummary, CourseAssignment, InstitutionalSettings, RolePermission, UserRole } from '../types';
 
 
 export const rolePermissionService = {
@@ -595,6 +595,7 @@ export const curricularAreaService = {
         // Map database snake_case to frontend camelCase if necessary
         return data.map(area => ({
             ...area,
+            id: area.id.toString(),
             level: area.level.charAt(0).toUpperCase() + area.level.slice(1),
             competencies: area.competencies.map((comp: any) => ({
                 id: comp.id.toString(),
@@ -605,10 +606,101 @@ export const curricularAreaService = {
         })) as CurricularArea[];
     },
 
+    async update(id: string | number, updates: Partial<CurricularArea>) {
+        const { competencies, ...dbUpdates } = updates as any;
+        if (dbUpdates.level) dbUpdates.level = dbUpdates.level.toLowerCase();
+
+        const { error } = await supabase
+            .from('curricular_areas')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async create(area: Partial<CurricularArea>) {
+        const { competencies, ...dbData } = area as any;
+        if (dbData.level) dbData.level = dbData.level.toLowerCase();
+
+        const { data, error } = await supabase
+            .from('curricular_areas')
+            .insert([dbData])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async delete(id: string | number) {
+        // First delete dependent competencies
+        const { error: compError } = await supabase
+            .from('competencies')
+            .delete()
+            .eq('area_id', id);
+
+        if (compError) throw compError;
+
+        // Then delete dependent course_assignments (if any exist)
+        const { error: assignError } = await supabase
+            .from('course_assignments')
+            .delete()
+            .eq('area_id', id);
+
+        if (assignError) {
+            // If column area_id doesn't exist in course_assignments (it should based on schema), ignore or log
+            console.warn('Could not delete related course assignments:', assignError);
+        }
+
+        const { error } = await supabase
+            .from('curricular_areas')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
     async updateCompetencyStatus(id: string | number, isEvaluated: boolean) {
         const { error } = await supabase
             .from('competencies')
             .update({ is_evaluated: isEvaluated })
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async createCompetency(competency: Omit<Competency, 'id'> & { area_id: string }) {
+        const { error } = await supabase
+            .from('competencies')
+            .insert([{
+                name: competency.name,
+                description: competency.description,
+                is_evaluated: competency.isEvaluated,
+                area_id: parseInt(competency.area_id)
+            }]);
+
+        if (error) throw error;
+    },
+
+    async updateCompetency(id: string, updates: Partial<Competency> & { area_id?: string }) {
+        const dbUpdates: any = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.description) dbUpdates.description = updates.description;
+        if (updates.isEvaluated !== undefined) dbUpdates.is_evaluated = updates.isEvaluated;
+        if (updates.area_id) dbUpdates.area_id = parseInt(updates.area_id);
+
+        const { error } = await supabase
+            .from('competencies')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async deleteCompetency(id: string) {
+        const { error } = await supabase
+            .from('competencies')
+            .delete()
             .eq('id', id);
 
         if (error) throw error;

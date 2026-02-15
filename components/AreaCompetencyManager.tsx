@@ -3,15 +3,29 @@ import React, { useState, useEffect } from 'react';
 import { CurricularArea, Competency } from '../types';
 import { curricularAreaService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
-import { Layers, Plus, Search, Trash2, Edit3, ChevronRight, Info, Copy, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { Layers, Plus, Search, Trash2, Edit3, ChevronRight, Info, CheckCircle2, X, Loader2, Save, AlertTriangle } from 'lucide-react';
 
 const AreaCompetencyManager: React.FC = () => {
   const [areas, setAreas] = useState<CurricularArea[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedArea, setSelectedArea] = useState<CurricularArea | null>(null);
-  const [showAreaForm, setShowAreaForm] = useState(false);
-  const [showCompetencyForm, setShowCompetencyForm] = useState(false);
+
+  // Area Modal State
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [editingArea, setEditingArea] = useState<CurricularArea | null>(null);
+  const [areaForm, setAreaForm] = useState({ name: '', level: 'Primaria', order: 0 });
+
+  // Competency Modal State
+  const [showCompetencyModal, setShowCompetencyModal] = useState(false);
+  const [editingCompetency, setEditingCompetency] = useState<Competency | null>(null);
+  const [competencyForm, setCompetencyForm] = useState({
+    name: '',
+    description: '',
+    isEvaluated: true,
+    targetAreaId: ''
+  });
+
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -23,6 +37,12 @@ const AreaCompetencyManager: React.FC = () => {
       setLoading(true);
       const data = await curricularAreaService.getAll();
       setAreas(data);
+
+      // Keep selected area in sync
+      if (selectedArea) {
+        const refreshed = data.find(a => a.id === selectedArea.id);
+        setSelectedArea(refreshed || null);
+      }
     } catch (error) {
       console.error('Error loading areas:', error);
       showToast('error', 'No se pudieron cargar las áreas curriculares.', 'Error de Conexión');
@@ -33,52 +53,142 @@ const AreaCompetencyManager: React.FC = () => {
 
   const filteredAreas = areas.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleCopyFromPrevious = () => {
-    if (window.confirm('¿Deseas importar la configuración de competencias del año anterior? Esta acción sobrescribirá cambios no guardados.')) {
-      // Lógica de simulación de copia
-      showToast('success', 'Configuración importada exitosamente desde el Ciclo 2024.', 'Importación Exitosa');
+  // Board Functions: Areas
+  const openNewAreaModal = () => {
+    setEditingArea(null);
+    setAreaForm({ name: '', level: 'Primaria', order: areas.length + 1 });
+    setShowAreaModal(true);
+  };
+
+  const openEditAreaModal = (area: CurricularArea) => {
+    setEditingArea(area);
+    setAreaForm({ name: area.name, level: area.level, order: area.order });
+    setShowAreaModal(true);
+  };
+
+  const handleSaveArea = async () => {
+    if (!areaForm.name.trim()) return showToast('error', 'El nombre es obligatorio', 'Validación');
+
+    try {
+      if (editingArea) {
+        await curricularAreaService.update(editingArea.id, {
+          name: areaForm.name,
+          level: areaForm.level as any,
+          order: areaForm.order
+        });
+        showToast('success', 'Área actualizada correctamente', 'Éxito');
+      } else {
+        await curricularAreaService.create({
+          name: areaForm.name,
+          level: areaForm.level as any,
+          order: areaForm.order
+        });
+        showToast('success', 'Área creada correctamente', 'Éxito');
+      }
+      setShowAreaModal(false);
+      loadAreas();
+    } catch (error) {
+      console.error('Error saving area:', error);
+      showToast('error', 'No se pudo guardar el área', 'Error');
     }
   };
 
-  const toggleCompetencyStatus = async (areaId: string, competencyId: string) => {
-    const area = areas.find(a => a.id === areaId);
-    const competency = area?.competencies.find(c => c.id === competencyId);
-
-    if (!competency) return;
-
-    const newStatus = !competency.isEvaluated;
-
-    // Optimistic UI update
-    const updatedAreas = areas.map(a => {
-      if (a.id === areaId) {
-        return {
-          ...a,
-          competencies: a.competencies.map(c =>
-            c.id === competencyId ? { ...c, isEvaluated: newStatus } : c
-          )
-        };
-      }
-      return a;
-    });
-
-    setAreas(updatedAreas);
-    if (selectedArea && selectedArea.id === areaId) {
-      setSelectedArea({
-        ...selectedArea,
-        competencies: selectedArea.competencies.map(c =>
-          c.id === competencyId ? { ...c, isEvaluated: newStatus } : c
-        )
-      });
-    }
+  const handleDeleteArea = async (area: CurricularArea) => {
+    if (!window.confirm(`¿Estás seguro de eliminar el área "${area.name}"? Se perderán todas sus competencias.`)) return;
 
     try {
-      await curricularAreaService.updateCompetencyStatus(competencyId, newStatus);
-      showToast('success', `Estado de competencia actualizado.`, 'Cambio Guardado');
-    } catch (error) {
-      console.error('Error updating competency status:', error);
-      showToast('error', 'No se pudo actualizar el estado en el servidor.', 'Error');
-      // Revert on error
+      await curricularAreaService.delete(area.id);
+      showToast('success', 'Área eliminada correctamente', 'Éxito');
+      if (selectedArea?.id === area.id) setSelectedArea(null);
       loadAreas();
+    } catch (error) {
+      console.error('Error deleting area:', error);
+      showToast('error', 'No se pudo eliminar el área', 'Error');
+    }
+  };
+
+  // Board Functions: Competencies
+  const openNewCompetencyModal = () => {
+    if (!selectedArea) return;
+    setEditingCompetency(null);
+    setCompetencyForm({
+      name: '',
+      description: '',
+      isEvaluated: true,
+      targetAreaId: selectedArea.id
+    });
+    setShowCompetencyModal(true);
+  };
+
+  const openEditCompetencyModal = (comp: Competency) => {
+    if (!selectedArea) return;
+    setEditingCompetency(comp);
+    setCompetencyForm({
+      name: comp.name,
+      description: comp.description,
+      isEvaluated: comp.isEvaluated,
+      targetAreaId: selectedArea.id
+    });
+    setShowCompetencyModal(true);
+  };
+
+  const handleSaveCompetency = async () => {
+    if (!selectedArea) return;
+    if (!competencyForm.name.trim()) return showToast('error', 'El nombre es obligatorio', 'Validación');
+
+    try {
+      if (editingCompetency) {
+        // Update
+        // Check if we need to move it
+        const updates: any = {
+          name: competencyForm.name,
+          description: competencyForm.description,
+          isEvaluated: competencyForm.isEvaluated
+        };
+
+        if (competencyForm.targetAreaId !== selectedArea.id) {
+          updates.area_id = competencyForm.targetAreaId;
+        }
+
+        await curricularAreaService.updateCompetency(editingCompetency.id, updates);
+        showToast('success', 'Competencia actualizada correctamente', 'Éxito');
+      } else {
+        // Create
+        await curricularAreaService.createCompetency({
+          name: competencyForm.name,
+          description: competencyForm.description,
+          isEvaluated: competencyForm.isEvaluated,
+          area_id: competencyForm.targetAreaId // Should usually be current area, but allow override
+        });
+        showToast('success', 'Competencia creada correctamente', 'Éxito');
+      }
+      setShowCompetencyModal(false);
+      loadAreas();
+    } catch (error) {
+      console.error('Error saving competency:', error);
+      showToast('error', 'No se pudo guardar la competencia', 'Error');
+    }
+  };
+
+  const handleDeleteCompetency = async (compId: string) => {
+    if (!window.confirm('¿Eliminar esta competencia?')) return;
+    try {
+      await curricularAreaService.deleteCompetency(compId);
+      showToast('success', 'Competencia eliminada', 'Éxito');
+      loadAreas();
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('error', 'No se pudo eliminar', 'Error');
+    }
+  };
+
+  const toggleStatus = async (compId: string, currentStatus: boolean) => {
+    try {
+      await curricularAreaService.updateCompetencyStatus(compId, !currentStatus);
+      // Optimistic update done by loadAreas usually, but let's just reload
+      loadAreas();
+    } catch (err) {
+      showToast('error', 'Error al cambiar estado', 'Error');
     }
   };
 
@@ -87,17 +197,11 @@ const AreaCompetencyManager: React.FC = () => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Estructura Curricular CNEB</h2>
-          <p className="text-slate-500 text-sm">Define las 31 competencias oficiales distribuidas por área y nivel.</p>
+          <p className="text-slate-500 text-sm">Gestiona las áreas, competencias y capacidades del plan de estudios.</p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleCopyFromPrevious}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all"
-          >
-            <Copy className="w-4 h-4" /> Importar 2024
-          </button>
-          <button
-            onClick={() => setShowAreaForm(true)}
+            onClick={openNewAreaModal}
             className="flex items-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all"
           >
             <Plus className="w-4 h-4" /> Nueva Área
@@ -106,7 +210,7 @@ const AreaCompetencyManager: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Panel Maestro: Lista de Áreas */}
+        {/* Helper Panel */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
             <div className="relative">
@@ -125,7 +229,7 @@ const AreaCompetencyManager: React.FC = () => {
             {loading ? (
               <div className="flex flex-col items-center justify-center p-20 text-slate-400">
                 <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                <p className="text-xs font-bold uppercase tracking-widest">Cargando Estructura...</p>
+                <p className="text-xs font-bold uppercase tracking-widest">Cargando...</p>
               </div>
             ) : filteredAreas.map(area => (
               <button
@@ -142,7 +246,7 @@ const AreaCompetencyManager: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="font-bold text-slate-800 text-sm">{area.name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{area.competencies.length} Competencias</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{area.competencies.length} Competencias • {area.name === 'Competencias Transversales' ? 'Todos (Transversal)' : area.level}</p>
                   </div>
                 </div>
                 <ChevronRight className={`w-4 h-4 transition-transform ${selectedArea?.id === area.id ? 'text-[#57C5D5] translate-x-1' : 'text-slate-300'}`} />
@@ -151,24 +255,41 @@ const AreaCompetencyManager: React.FC = () => {
           </div>
         </div>
 
-        {/* Panel Detalle: Competencias del Área Seleccionada */}
+        {/* Detail Panel */}
         <div className="lg:col-span-7">
           {selectedArea ? (
             <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden animate-in slide-in-from-right-4 duration-300">
               <header className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black text-slate-900">{selectedArea.name}</h3>
-                  <p className="text-xs text-slate-500 font-medium">Gestión de competencias asociadas al reporte de notas.</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-500 uppercase">{selectedArea.name === 'Competencias Transversales' ? 'TODOS (Transversal)' : selectedArea.level}</span>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setShowCompetencyForm(true)}
-                  className="px-4 py-2 bg-[#57C5D5] text-white rounded-xl text-xs font-bold hover:bg-[#46b3c2] shadow-md"
-                >
-                  Agregar Competencia
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEditAreaModal(selectedArea)}
+                    className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-[#57C5D5] transition-colors" title="Editar Área"
+                  >
+                    <Edit3 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteArea(selectedArea)}
+                    className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors" title="Eliminar Área"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 mx-1"></div>
+                  <button
+                    onClick={openNewCompetencyModal}
+                    className="px-4 py-2 bg-[#57C5D5] text-white rounded-xl text-xs font-bold hover:bg-[#46b3c2] shadow-md flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Competencia
+                  </button>
+                </div>
               </header>
 
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto">
                 {selectedArea.competencies.length > 0 ? (
                   selectedArea.competencies.map((comp) => (
                     <div key={comp.id} className="p-5 bg-white border border-slate-100 rounded-2xl hover:border-[#57C5D5] transition-all group shadow-sm">
@@ -178,22 +299,33 @@ const AreaCompetencyManager: React.FC = () => {
                             <h4 className="font-bold text-slate-800 text-sm">{comp.name}</h4>
                             {comp.isEvaluated && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                           </div>
-                          <p className="text-xs text-slate-500 mt-2 leading-relaxed">{comp.description}</p>
+                          <p className="text-xs text-slate-500 mt-2 leading-relaxed whitespace-pre-wrap">{comp.description}</p>
                         </div>
                         <div className="flex flex-col items-end gap-3">
-                          <label className="relative inline-flex items-center cursor-pointer">
+                          <label className="relative inline-flex items-center cursor-pointer" title="Activar/Desactivar evaluación">
                             <input
                               type="checkbox"
                               className="sr-only peer"
                               checked={comp.isEvaluated}
-                              onChange={() => toggleCompetencyStatus(selectedArea.id, comp.id)}
+                              onChange={() => toggleStatus(comp.id, comp.isEvaluated)}
                             />
                             <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#57C5D5]"></div>
-                            <span className="ml-2 text-[9px] font-black text-slate-400 uppercase tracking-tighter">Evaluar</span>
                           </label>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="p-1.5 hover:bg-slate-50 rounded text-slate-300 hover:text-[#57C5D5]"><Edit3 className="w-4 h-4" /></button>
-                            <button className="p-1.5 hover:bg-slate-50 rounded text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                            <button
+                              onClick={() => openEditCompetencyModal(comp)}
+                              className="p-1.5 hover:bg-slate-50 rounded text-slate-300 hover:text-[#57C5D5]"
+                              title="Editar"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCompetency(comp.id)}
+                              className="p-1.5 hover:bg-slate-50 rounded text-slate-300 hover:text-red-500"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -202,17 +334,10 @@ const AreaCompetencyManager: React.FC = () => {
                 ) : (
                   <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
                     <Layers className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                    <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">No hay competencias registradas</p>
+                    <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">No hay competencias</p>
                   </div>
                 )}
               </div>
-
-              <footer className="p-4 bg-slate-50/50 border-t border-slate-100 flex items-center gap-2">
-                <Info className="w-4 h-4 text-[#57C5D5]" />
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                  Estas competencias aparecerán en la libreta bajo el área de {selectedArea.name}.
-                </p>
-              </footer>
             </div>
           ) : (
             <div className="h-full min-h-[400px] flex flex-col items-center justify-center bg-white border border-slate-100 rounded-3xl shadow-sm text-center p-10">
@@ -220,33 +345,140 @@ const AreaCompetencyManager: React.FC = () => {
                 <Layers className="w-16 h-16 text-slate-200" />
               </div>
               <h3 className="text-xl font-black text-slate-900">Configuración Curricular</h3>
-              <p className="text-slate-400 text-sm mt-2 max-w-xs">Selecciona un área curricular del panel izquierdo para gestionar sus competencias de evaluación.</p>
+              <p className="text-slate-400 text-sm mt-2 max-w-xs">Selecciona un área curricular del panel izquierdo para empezar.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal Simulado: Nueva Área */}
-      {showAreaForm && (
+      {/* MODAL: Nueva/Editar Área */}
+      {showAreaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
             <header className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">Nueva Área Curricular</h3>
-              <button onClick={() => setShowAreaForm(false)}><X className="w-6 h-6 text-slate-400" /></button>
+              <h3 className="font-bold text-slate-900">{editingArea ? 'Editar Área' : 'Nueva Área Curricular'}</h3>
+              <button onClick={() => setShowAreaModal(false)}><X className="w-6 h-6 text-slate-400" /></button>
             </header>
             <div className="p-8 space-y-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre del Área</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5]" placeholder="Ej. Arte y Cultura" />
+                <input
+                  type="text"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                  placeholder="Ej. Arte y Cultura"
+                  value={areaForm.name}
+                  onChange={e => setAreaForm({ ...areaForm, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nivel</label>
+                  <select
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                    value={areaForm.level}
+                    onChange={e => setAreaForm({ ...areaForm, level: e.target.value })}
+                  >
+                    <option value="Inicial">Inicial</option>
+                    <option value="Primaria">Primaria</option>
+                    <option value="Secundaria">Secundaria</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Orden</label>
+                  <input
+                    type="number"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                    value={areaForm.order}
+                    onChange={e => setAreaForm({ ...areaForm, order: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
               </div>
             </div>
             <footer className="p-6 bg-slate-50 border-t flex justify-end gap-3">
-              <button onClick={() => setShowAreaForm(false)} className="px-6 py-2 text-sm font-bold text-slate-400">Cancelar</button>
-              <button className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm">Crear Área</button>
+              <button onClick={() => setShowAreaModal(false)} className="px-6 py-2 text-sm font-bold text-slate-400 hover:text-slate-600">Cancelar</button>
+              <button onClick={handleSaveArea} className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm hover:bg-[#46b3c2] flex items-center gap-2">
+                <Save className="w-4 h-4" /> {editingArea ? 'Actualizar' : 'Crear'}
+              </button>
             </footer>
           </div>
         </div>
       )}
+
+      {/* MODAL: Nueva/Editar Competencia */}
+      {showCompetencyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <header className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900">{editingCompetency ? 'Editar Competencia' : 'Nueva Competencia'}</h3>
+              <button onClick={() => setShowCompetencyModal(false)}><X className="w-6 h-6 text-slate-400" /></button>
+            </header>
+            <div className="p-8 space-y-6">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre</label>
+                <textarea
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5] min-h-[80px]"
+                  placeholder="Ej. Resuelve problemas de forma, movimiento y localización"
+                  value={competencyForm.name}
+                  onChange={e => setCompetencyForm({ ...competencyForm, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descripción (Opcional)</label>
+                <textarea
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5] min-h-[60px]"
+                  placeholder="Detalles adicionales..."
+                  value={competencyForm.description}
+                  onChange={e => setCompetencyForm({ ...competencyForm, description: e.target.value })}
+                />
+              </div>
+
+              {/* Área Selector (Move Competency) */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Layers className="w-3 h-3" /> Área Asignada
+                </label>
+                <select
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#57C5D5]"
+                  value={competencyForm.targetAreaId}
+                  onChange={e => setCompetencyForm({ ...competencyForm, targetAreaId: e.target.value })}
+                >
+                  {areas.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.level})
+                    </option>
+                  ))}
+                </select>
+                {editingCompetency && competencyForm.targetAreaId !== selectedArea?.id && (
+                  <p className="text-xs text-amber-500 font-bold flex items-center gap-1 mt-1">
+                    <AlertTriangle className="w-3 h-3" /> La competencia se moverá a otra área.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <input
+                  type="checkbox"
+                  id="evalCheck"
+                  className="w-5 h-5 accent-[#57C5D5] rounded cursor-pointer"
+                  checked={competencyForm.isEvaluated}
+                  onChange={e => setCompetencyForm({ ...competencyForm, isEvaluated: e.target.checked })}
+                />
+                <label htmlFor="evalCheck" className="text-sm text-slate-600 cursor-pointer select-none">
+                  Habilitar evaluación en libreta
+                </label>
+              </div>
+
+            </div>
+            <footer className="p-6 bg-slate-50 border-t flex justify-end gap-3">
+              <button onClick={() => setShowCompetencyModal(false)} className="px-6 py-2 text-sm font-bold text-slate-400 hover:text-slate-600">Cancelar</button>
+              <button onClick={handleSaveCompetency} className="px-8 py-2.5 bg-[#57C5D5] text-white rounded-xl font-bold text-sm hover:bg-[#46b3c2] flex items-center gap-2">
+                <Save className="w-4 h-4" /> {editingCompetency ? 'Actualizar' : 'Crear'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
