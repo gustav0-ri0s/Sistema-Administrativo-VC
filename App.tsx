@@ -40,12 +40,19 @@ const App: React.FC = () => {
   const [viewingYear, setViewingYear] = useState<number>(new Date().getFullYear());
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const { academicYears, setAcademicYears, refreshYears } = useAcademicYear();
+  const { academicYears, setAcademicYears, refreshYears, setSelectedYear } = useAcademicYear();
 
   const selectedYearData = useMemo(() =>
     academicYears.find(y => y.year === viewingYear),
     [viewingYear, academicYears]
   );
+
+  // Sync viewingYear with AcademicYearContext so all components get the correct year
+  React.useEffect(() => {
+    if (selectedYearData) {
+      setSelectedYear(selectedYearData);
+    }
+  }, [selectedYearData, setSelectedYear]);
 
   const loadUserData = useCallback(async (userId: string) => {
     try {
