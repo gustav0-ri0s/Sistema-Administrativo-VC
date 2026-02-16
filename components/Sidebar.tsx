@@ -4,7 +4,7 @@ import { NAVIGATION_ITEMS, ROLE_LABELS } from '../constants';
 import { Student, AcademicStatus, Profile, UserRole } from '../types';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
 import { settingsService } from '../services/database.service';
-import { LogOut, X } from 'lucide-react';
+import { LogOut, X, Home } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -123,13 +123,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onCl
               <p className="text-[10px] text-slate-500 truncate text-left uppercase tracking-tighter">{ROLE_LABELS[currentUser.role]}</p>
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors text-sm font-black uppercase tracking-widest"
-          >
-            <LogOut className="w-5 h-5" />
-            Cerrar Sesión
-          </button>
+          <div className="space-y-1">
+            <button
+              onClick={() => window.location.href = import.meta.env.VITE_PORTAL_URL || '/'}
+              className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-[#57C5D5] rounded-xl transition-all hover:bg-slate-800/50 border border-transparent hover:border-slate-800 group"
+            >
+              <Home className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium">Volver al Portal</span>
+            </button>
+
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors text-sm font-black uppercase tracking-widest"
+            >
+              <LogOut className="w-5 h-5" />
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
       </aside>
     </>
