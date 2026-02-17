@@ -1,16 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import { AcademicYear, IncidentSummary, Classroom } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { AcademicYear, IncidentSummary, Classroom, UserRole } from '../types';
 import { academicService, incidentService, profileService, studentService, classroomService } from '../services/database.service';
 
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink, Loader2, Calendar } from 'lucide-react';
+import { UserPlus, Users, School, AlertTriangle, CheckCircle, Clock, Eye, ExternalLink, Loader2, Calendar, ClipboardCheck, ArrowRight } from 'lucide-react';
 
 interface EnrollmentDashboardProps {
   selectedYear?: AcademicYear;
+  userRole?: UserRole;
 }
 
-const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear: propsSelectedYear }) => {
+const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear: propsSelectedYear, userRole }) => {
+  const navigate = useNavigate();
   // Use context, fallback to props for backward compatibility
   const { selectedYear: contextYear, isYearReadOnly } = useAcademicYear();
   const selectedYear = contextYear || propsSelectedYear;
@@ -97,6 +100,45 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
             <p className="text-sm font-bold text-[#57C5D5]">Periodo de Matrícula {selectedYear?.year}</p>
             <p className="text-xs text-slate-600">El sistema está abierto para el registro de nuevos estudiantes y re-matrículas. Las clases aún no han iniciado.</p>
           </div>
+        </div>
+      )}
+
+      {/* Quick Actions for Secretary/Admin */}
+      {(userRole === UserRole.SECRETARIA || userRole === UserRole.ADMIN) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+          <button
+            onClick={() => navigate('/enrollment')}
+            className="group p-6 bg-white border-2 border-slate-100 rounded-3xl hover:border-[#57C5D5] transition-all text-left shadow-sm hover:shadow-xl relative overflow-hidden active:scale-95"
+          >
+            <div className="absolute right-0 top-0 w-32 h-32 bg-[#57C5D5]/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
+            <div className="flex items-start justify-between relative">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                <ClipboardCheck className="w-6 h-6" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#57C5D5] group-hover:translate-x-1 transition-all" />
+            </div>
+            <div className="mt-4 relative">
+              <h4 className="text-lg font-bold text-slate-800">Nueva Matrícula</h4>
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">Inicia el proceso completo de inscripción para alumnos nuevos.</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/students')}
+            className="group p-6 bg-white border-2 border-slate-100 rounded-3xl hover:border-[#ac94f4] transition-all text-left shadow-sm hover:shadow-xl relative overflow-hidden active:scale-95"
+          >
+            <div className="absolute right-0 top-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
+            <div className="flex items-start justify-between relative">
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
+                <Users className="w-6 h-6" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+            </div>
+            <div className="mt-4 relative">
+              <h4 className="text-lg font-bold text-slate-800">Padrón de Estudiantes</h4>
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">Consulta expedientes y realiza registros rápidos (Fichas).</p>
+            </div>
+          </button>
         </div>
       )}
 

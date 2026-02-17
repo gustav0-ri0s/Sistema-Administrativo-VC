@@ -100,7 +100,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     return (
       <Routes>
-        <Route path="/dashboard" element={<EnrollmentDashboard selectedYear={selectedYearData} />} />
+        <Route path="/dashboard" element={<EnrollmentDashboard selectedYear={selectedYearData} userRole={currentUser?.role} />} />
         <Route path="/academic-year" element={<AcademicYearManager years={academicYears} setYears={setAcademicYears} />} />
         <Route path="/enrollment" element={<EnrollmentWizard academicYears={academicYears} onTabChange={setActiveTab} />} />
         <Route path="/areas" element={<AreaCompetencyManager />} />

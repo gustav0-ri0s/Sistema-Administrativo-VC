@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Student, AcademicStatus, Classroom } from '../types';
 import { studentService, classroomService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2, Filter, Eye, Phone, MapPin, Briefcase, Heart, BellRing, School, Info } from 'lucide-react';
+import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2, Filter, Eye, Phone, MapPin, Briefcase, Heart, BellRing, School, Info, ArrowRight, ClipboardCheck, UserPlus } from 'lucide-react';
 
 const StudentManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,6 +15,7 @@ const StudentManagement: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [showIntentModal, setShowIntentModal] = useState(false);
 
   // Filtros de Grado y Sección
   const [selectedLevel, setSelectedLevel] = useState<string>('');
@@ -208,13 +211,75 @@ const StudentManagement: React.FC = () => {
           <p className="text-slate-500 text-sm text-left">Registro oficial de la I.E.P. 'Valores y Ciencias'.</p>
         </div>
         <button
-          onClick={handleAddNewClick}
+          onClick={() => setShowIntentModal(true)}
           className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#57C5D5] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#57C5D5]/20 hover:bg-[#46b3c2] transition-all w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           Registrar Estudiante
         </button>
       </header>
+
+      {/* Decision Modal */}
+      {showIntentModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 bg-[#57C5D5]/10 rounded-2xl">
+                <UserCircle className="w-8 h-8 text-[#57C5D5]" />
+              </div>
+              <button
+                onClick={() => setShowIntentModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <h3 className="text-2xl font-black text-slate-900 leading-tight">¿Qué acción deseas realizar?</h3>
+            <p className="text-slate-500 mt-2 text-sm font-medium">Selecciona el tipo de registro que necesitas procesar.</p>
+
+            <div className="mt-8 space-y-4">
+              <button
+                onClick={() => {
+                  setShowIntentModal(false);
+                  navigate('/enrollment');
+                }}
+                className="w-full group p-5 bg-white border-2 border-slate-100 rounded-3xl hover:border-[#57C5D5] transition-all text-left flex items-center gap-4 hover:shadow-xl hover:shadow-[#57C5D5]/10"
+              >
+                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform">
+                  <ClipboardCheck className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-slate-800 text-base">Matrícula Formal (Completa)</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Recomendado para alumnos nuevos</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#57C5D5] group-hover:translate-x-1 transition-all" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowIntentModal(false);
+                  handleAddNewClick();
+                }}
+                className="w-full group p-5 bg-white border-2 border-slate-100 rounded-3xl hover:border-amber-400 transition-all text-left flex items-center gap-4 hover:shadow-xl hover:shadow-amber-400/10"
+              >
+                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
+                  <UserPlus className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-slate-800 text-base">Solo Ficha de Identidad</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Para pre-registros rápidos o reservas</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+              </button>
+            </div>
+
+            <p className="mt-8 text-[10px] text-slate-400 font-bold uppercase tracking-[0.1em] text-center px-4">
+              I.E.P. Valores y Ciencias • Gestión Académica
+            </p>
+          </div>
+        </div>
+      )}
 
 
       {showForm && (
