@@ -3,7 +3,7 @@ import { Student, AcademicStatus, Classroom } from '../types';
 import { studentService, classroomService } from '../services/database.service';
 import { useToast } from '../contexts/ToastContext';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
-import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2, Filter, Eye, Phone, MapPin, Briefcase, Heart, BellRing, School } from 'lucide-react';
+import { Search, Plus, UserCircle, Calendar, CreditCard, ChevronDown, Edit3, Mail, Trash2, X, Loader2, Filter, Eye, Phone, MapPin, Briefcase, Heart, BellRing, School, Info } from 'lucide-react';
 
 const StudentManagement: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -73,7 +73,7 @@ const StudentManagement: React.FC = () => {
     email: '',
     birth_date: '',
     address: '',
-    academic_status: AcademicStatus.ACTIVO
+    academic_status: AcademicStatus.SIN_MATRICULA
   });
 
   const filteredStudents = students.filter(s => {
@@ -126,7 +126,7 @@ const StudentManagement: React.FC = () => {
       email: '',
       birth_date: '',
       address: '',
-      academic_status: AcademicStatus.ACTIVO
+      academic_status: AcademicStatus.SIN_MATRICULA
     });
     setShowForm(true);
   };
@@ -300,14 +300,28 @@ const StudentManagement: React.FC = () => {
               <select
                 value={formData.academic_status}
                 onChange={(e) => setFormData({ ...formData, academic_status: e.target.value as AcademicStatus })}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none font-bold"
               >
-                {Object.values(AcademicStatus).map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
+                {Object.values(AcademicStatus).map(status => {
+                  // Si es un registro nuevo, solo permitir Sin Matrícula o Reserva
+                  if (!editingStudent && status !== AcademicStatus.SIN_MATRICULA && status !== AcademicStatus.RESERVA) {
+                    return null;
+                  }
+                  return <option key={status} value={status}>{status}</option>;
+                })}
               </select>
             </div>
           </div>
+
+          {!editingStudent && (
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+              <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-800 leading-relaxed font-bold uppercase tracking-tight">
+                <p>Nota: Al registrar un nuevo estudiante aquí, se crea su ficha de identidad.</p>
+                <p className="mt-1">Para realizar la matrícula formal y asignarlo a una aula (Matriculado/Activo), debe utilizar el módulo de <span className="underline italic">Matrícula</span>.</p>
+              </div>
+            </div>
+          )}
           <div className="mt-8 flex justify-end gap-3">
             <button onClick={() => setShowForm(false)} className="px-6 py-2 text-sm font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">Descartar</button>
             <button
