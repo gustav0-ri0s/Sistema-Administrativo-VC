@@ -123,7 +123,7 @@ export interface Student {
   gender: 'M' | 'F';
   address: string;
   academic_status: AcademicStatus;
-  classroomId?: string;
+  classroom_id?: string;
   academic_year_id: number;
   parents: Parent[];
 }

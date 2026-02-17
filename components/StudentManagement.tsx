@@ -84,10 +84,10 @@ const StudentManagement: React.FC = () => {
     // Lógica de filtrado por aula
     let matchesClassroom = true;
     if (selectedLevel || selectedGrade || selectedSection) {
-      if (!s.classroomId) {
+      if (!s.classroom_id) {
         matchesClassroom = false; // Si hay filtros activos y el alumno no tiene aula, no coincide
       } else {
-        const studentClassroom = classrooms.find(c => c.id === s.classroomId);
+        const studentClassroom = classrooms.find(c => c.id === s.classroom_id);
         if (!studentClassroom) {
           matchesClassroom = false;
         } else {
@@ -409,7 +409,7 @@ const StudentManagement: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.map((s) => {
-                const studentClassroom = classrooms.find(c => c.id === s.classroomId);
+                const studentClassroom = classrooms.find(c => c.id === s.classroom_id);
 
                 return (
                   <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
@@ -553,13 +553,13 @@ const StudentManagement: React.FC = () => {
                       <p className="text-sm font-bold text-slate-700">{viewingStudent.email || 'No asignado'}</p>
                     </div>
                   </div>
-                  {viewingStudent.classroomId && (
+                  {viewingStudent.classroom_id && (
                     <div className="flex items-center gap-3">
                       <School className="w-5 h-5 text-[#57C5D5]/50" />
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Aula Asignada</p>
                         {(() => {
-                          const room = classrooms.find(c => c.id === viewingStudent.classroomId);
+                          const room = classrooms.find(c => c.id === viewingStudent.classroom_id);
                           return room ? (
                             <p className="text-sm font-bold text-slate-700">{room.grade} "{room.section}" ({room.level})</p>
                           ) : (
