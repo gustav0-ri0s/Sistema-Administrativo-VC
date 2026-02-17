@@ -103,44 +103,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
         </div>
       )}
 
-      {/* Quick Actions for Secretary/Admin */}
-      {(userRole === UserRole.SECRETARIA || userRole === UserRole.ADMIN) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
-          <button
-            onClick={() => navigate('/enrollment')}
-            className="group p-6 bg-white border-2 border-slate-100 rounded-3xl hover:border-[#57C5D5] transition-all text-left shadow-sm hover:shadow-xl relative overflow-hidden active:scale-95"
-          >
-            <div className="absolute right-0 top-0 w-32 h-32 bg-[#57C5D5]/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
-            <div className="flex items-start justify-between relative">
-              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-                <ClipboardCheck className="w-6 h-6" />
-              </div>
-              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#57C5D5] group-hover:translate-x-1 transition-all" />
-            </div>
-            <div className="mt-4 relative">
-              <h4 className="text-lg font-bold text-slate-800">Nueva Matrícula</h4>
-              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">Inicia el proceso completo de inscripción para alumnos nuevos.</p>
-            </div>
-          </button>
 
-          <button
-            onClick={() => navigate('/students')}
-            className="group p-6 bg-white border-2 border-slate-100 rounded-3xl hover:border-[#ac94f4] transition-all text-left shadow-sm hover:shadow-xl relative overflow-hidden active:scale-95"
-          >
-            <div className="absolute right-0 top-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
-            <div className="flex items-start justify-between relative">
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-                <Users className="w-6 h-6" />
-              </div>
-              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
-            </div>
-            <div className="mt-4 relative">
-              <h4 className="text-lg font-bold text-slate-800">Padrón de Estudiantes</h4>
-              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">Consulta expedientes y realiza registros rápidos (Fichas).</p>
-            </div>
-          </button>
-        </div>
-      )}
 
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
@@ -212,6 +175,28 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           </div>
         </div>
       </div>
+
+      {/* Nueva Matrícula - Acción Rápida Estética */}
+      {(userRole === UserRole.SECRETARIA || userRole === UserRole.ADMIN) && (
+        <div className="bg-white p-3 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 animate-in slide-in-from-bottom-4 duration-700">
+          <div className="flex flex-col md:flex-row items-center gap-4 px-3">
+            <div className="p-4 bg-[#57C5D5] text-white rounded-[1.5rem] shadow-xl shadow-[#57C5D5]/20">
+              <ClipboardCheck className="w-6 h-6" />
+            </div>
+            <div className="text-center md:text-left">
+              <h4 className="text-base font-black text-slate-800 uppercase tracking-tight">Proceso de Matrícula {selectedYear?.year}</h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-0.5">Inicia la inscripción formal de un nuevo estudiante</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/enrollment')}
+            className="flex items-center gap-3 px-8 py-3.5 bg-slate-900 text-white rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#57C5D5] transition-all shadow-xl active:scale-95 group"
+          >
+            Comenzar Matrícula
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Monitoreo de Vacantes */}
