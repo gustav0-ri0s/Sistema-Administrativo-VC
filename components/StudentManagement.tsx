@@ -49,10 +49,12 @@ const StudentManagement: React.FC = () => {
     .map(c => c.grade)
   )).sort((a, b) => {
     // Intento de ordenamiento inteligente (números primero, luego texto)
-    const numA = parseInt(a);
-    const numB = parseInt(b);
+    const gradeA = String(a);
+    const gradeB = String(b);
+    const numA = parseInt(gradeA);
+    const numB = parseInt(gradeB);
     if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return a.localeCompare(b);
+    return gradeA.localeCompare(gradeB);
   });
 
   const sections = Array.from(new Set(classrooms
@@ -336,7 +338,7 @@ const StudentManagement: React.FC = () => {
             >
               <option value="">Todos los Niveles</option>
               {levels.map(level => (
-                <option key={level} value={level}>{level.toUpperCase()}</option>
+                <option key={level} value={level}>{String(level).toUpperCase()}</option>
               ))}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -392,6 +394,22 @@ const StudentManagement: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        </div>
+
+        {/* Student Count Summary */}
+        <div className="flex items-center gap-3 px-2">
+          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+            Mostrando {filteredStudents.length} {filteredStudents.length === 1 ? 'estudiante' : 'estudiantes'}
+          </span>
+          {(selectedLevel || selectedGrade || selectedSection) && (
+            <span className="px-2 py-0.5 bg-[#57C5D5]/10 text-[#57C5D5] rounded-full text-[10px] font-black uppercase tracking-wider">
+              {[
+                selectedLevel,
+                selectedGrade,
+                selectedSection ? `Sección ${selectedSection}` : ''
+              ].filter(Boolean).join(' • ')}
+            </span>
+          )}
         </div>
       </div>
 
