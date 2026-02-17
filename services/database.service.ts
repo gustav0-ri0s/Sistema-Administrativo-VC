@@ -224,6 +224,7 @@ export const studentService = {
         // Map the join table structure to the flat parents list expected by the UI
         return data.map((s: any) => ({
             ...s,
+            classroom_id: s.classroom_id?.toString(),
             parents: s.student_parents?.map((sp: any) => ({
                 ...sp.parents,
                 relationship: sp.relationship,
@@ -311,6 +312,7 @@ export const studentService = {
 
         return data.map((s: any) => ({
             ...s,
+            classroom_id: s.classroom_id?.toString(),
             parents: s.student_parents?.map((sp: any) => ({
                 ...sp.parents,
                 relationship: sp.relationship,
