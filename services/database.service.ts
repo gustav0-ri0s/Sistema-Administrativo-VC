@@ -173,7 +173,8 @@ export const courseAssignmentService = {
             profileId: d.profile_id,
             classroomId: d.classroom_id.toString(),
             hoursPerWeek: d.hours_per_week || 0,
-            academicYearId: d.academic_year_id
+            academicYearId: d.academic_year_id,
+            competencyId: d.competency_id
         })) as CourseAssignment[];
     },
 
@@ -183,7 +184,8 @@ export const courseAssignmentService = {
             profile_id: a.profileId,
             classroom_id: parseInt(a.classroomId),
             hours_per_week: a.hoursPerWeek,
-            ...(academicYearId ? { academic_year_id: academicYearId } : {})
+            ...(academicYearId ? { academic_year_id: academicYearId } : {}),
+            competency_id: a.competencyId ? parseInt(a.competencyId.toString()) : null
         }));
 
         const { data, error } = await supabase

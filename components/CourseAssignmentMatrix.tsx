@@ -136,12 +136,18 @@ const CourseAssignmentMatrix: React.FC = () => {
       // Create new assignments
       const newAssignments: Omit<CourseAssignment, 'id'>[] = [];
       Object.entries(matrix).forEach(([classroomId, areaIds]) => {
-        if (selectedClassroomIds.includes(classroomId)) { // Only save for selected rooms
-          (areaIds as string[]).forEach((areaId: string) => {
+        if (selectedClassroomIds.includes(classroomId)) {
+          (areaIds as string[]).forEach((areaKey: string) => {
+            // Check if it's a compound key (courseId:competencyId)
+            const [courseId, competencyId] = areaKey.includes(':')
+              ? areaKey.split(':')
+              : [areaKey, undefined];
+
             newAssignments.push({
               profileId: selectedTeacher.id,
               classroomId: classroomId, // Keep as string based on types
-              courseId: areaId, // Keep as string based on types
+              courseId: courseId, // Keep as string based on types
+              competencyId: competencyId ? parseInt(competencyId) : undefined,
               hoursPerWeek: hoursPerWeek
             });
           });
@@ -250,8 +256,8 @@ const CourseAssignmentMatrix: React.FC = () => {
             <p className="text-slate-500 text-sm font-medium">Gestión administrativa de la estructura académica.</p>
             {selectedYear && (
               <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${selectedYear.is_active
-                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                  : 'bg-slate-50 text-slate-400 border-slate-200'
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                : 'bg-slate-50 text-slate-400 border-slate-200'
                 }`}>
                 Ciclo {selectedYear.year}
               </span>
@@ -474,6 +480,41 @@ const CourseAssignmentMatrix: React.FC = () => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {areas.map(area => {
+                                const isMath = area.name.toLowerCase().includes('matemática') || area.name.toLowerCase().includes('matematica');
+                                const isSecondary = room?.level.toLowerCase() === 'secundaria';
+
+                                if (isMath && isSecondary && area.competencies && area.competencies.length > 0) {
+                                  return (
+                                    <div key={area.id} className="col-span-full md:col-span-2 lg:col-span-3 bg-slate-100/50 p-5 rounded-[2rem] border border-slate-200">
+                                      <p className="font-black text-slate-700 mb-3 uppercase tracking-tight text-xs flex items-center gap-2">
+                                        <Book className="w-4 h-4 text-[#57C5D5]" />
+                                        {area.name} (Por Competencias)
+                                      </p>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {area.competencies.map(comp => {
+                                          const assignmentKey = `${area.id}:${comp.id}`;
+                                          const isSelected = selectedAreasForThisRoom.includes(assignmentKey);
+                                          return (
+                                            <button
+                                              key={comp.id}
+                                              onClick={() => toggleMatrixCell(cid, assignmentKey)}
+                                              className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${isSelected
+                                                ? 'bg-white border-[#57C5D5] text-slate-800 shadow-lg shadow-[#57C5D5]/5'
+                                                : 'bg-white/50 border-white text-slate-400 hover:border-slate-200 hover:bg-white'
+                                                }`}
+                                            >
+                                              <div className="mt-0.5 shrink-0">
+                                                {isSelected ? <CheckSquare className="w-4 h-4 text-[#57C5D5]" /> : <Square className="w-4 h-4 opacity-30" />}
+                                              </div>
+                                              <span className="text-[10px] font-bold leading-tight uppercase tracking-tight">{comp.name}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
                                 const isSelected = selectedAreasForThisRoom.includes(area.id);
                                 return (
                                   <button
@@ -675,7 +716,12 @@ const CourseAssignmentMatrix: React.FC = () => {
                             <h4 className={`text-sm font-black uppercase tracking-tight ${area?.name ? 'text-slate-800' : 'text-slate-400 italic'}`}>
                               {area?.name || 'Curso No Especificado'}
                             </h4>
-                            <div className="flex items-center gap-3">
+                            {as.competencyId && area?.competencies && (
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 leading-tight">
+                                • {area.competencies.find(c => c.id === as.competencyId?.toString())?.name || 'Competencia Desconocida'}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 mt-1.5">
                               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                                 <Clock className="w-3 h-3" /> {as.hoursPerWeek} Horas semanales
                               </span>

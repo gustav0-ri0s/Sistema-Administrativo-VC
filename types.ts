@@ -93,6 +93,7 @@ export interface CourseAssignment {
   classroomId: string;
   hoursPerWeek: number;
   academicYearId?: number;
+  competencyId?: string | number;
 }
 
 export interface BimestreConfig {
