@@ -68,6 +68,7 @@ export interface Classroom {
   capacity: number;
   enrolled: number;
   active: boolean;
+  tutorName?: string;
 }
 
 export interface Competency {

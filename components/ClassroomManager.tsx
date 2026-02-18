@@ -386,6 +386,9 @@ const ClassroomManager: React.FC = () => {
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                     {selectedClassroom.level} • {classroomStudents.length} matriculados
                   </p>
+                  <p className="text-[10px] font-bold text-[#57C5D5] uppercase tracking-widest mt-1">
+                    {selectedClassroom.tutorName ? `Tutor: ${selectedClassroom.tutorName}` : 'Sin tutor asignado'}
+                  </p>
                 </div>
               </div>
               <button

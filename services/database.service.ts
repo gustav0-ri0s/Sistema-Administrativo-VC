@@ -505,31 +505,50 @@ export const incidentService = {
 export const classroomService = {
     async getAll() {
         console.log('classroomService: getAll() called');
-        const { data, error } = await supabase
-            .from('classrooms')
-            .select(`
-                *,
-                students (id)
-            `)
-            .order('level', { ascending: true })
-            .order('grade', { ascending: true })
-            .order('section', { ascending: true });
 
-        if (error) {
-            console.error('classroomService: getAll() error:', error);
-            throw error;
+        // Fetch classrooms and tutors in parallel
+        const [classroomsResponse, tutorsResponse] = await Promise.all([
+            supabase
+                .from('classrooms')
+                .select(`
+                    *,
+                    students (id)
+                `)
+                .order('level', { ascending: true })
+                .order('grade', { ascending: true })
+                .order('section', { ascending: true }),
+
+            supabase
+                .from('profiles')
+                .select('id, full_name, tutor_classroom_id')
+                .not('tutor_classroom_id', 'is', null)
+        ]);
+
+        if (classroomsResponse.error) {
+            console.error('classroomService: getAll() error:', classroomsResponse.error);
+            throw classroomsResponse.error;
         }
 
-        return data.map(item => ({
+        const tutorMap = new Map<string, string>();
+        if (tutorsResponse.data) {
+            tutorsResponse.data.forEach((tutor: any) => {
+                if (tutor.tutor_classroom_id) {
+                    tutorMap.set(tutor.tutor_classroom_id.toString(), tutor.full_name);
+                }
+            });
+        }
+
+        return classroomsResponse.data?.map(item => ({
             ...item,
             id: item.id.toString(),
             enrolled: (item.students as any[])?.length || 0,
-            active: item.active ?? true
+            active: item.active ?? true,
+            tutorName: tutorMap.get(item.id.toString())
         })) as Classroom[];
     },
 
     async create(classroom: Partial<Classroom>) {
-        const { enrolled, ...dbData } = classroom as any;
+        const { enrolled, tutorName, ...dbData } = classroom as any;
         if (dbData.level) dbData.level = dbData.level.toLowerCase();
 
         const { data, error } = await supabase
@@ -544,7 +563,7 @@ export const classroomService = {
 
     async update(id: string | number, updates: Partial<Classroom>) {
         console.log('classroomService: update() called', { id, updates });
-        const { enrolled, ...dbUpdates } = updates as any; // Strip non-DB fields
+        const { enrolled, tutorName, ...dbUpdates } = updates as any; // Strip non-DB fields
 
         // Ensure level is lowercase if present
         if (dbUpdates.level) {
