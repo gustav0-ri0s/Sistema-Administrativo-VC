@@ -699,50 +699,80 @@ const CourseAssignmentMatrix: React.FC = () => {
 
               <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
                 <div className="grid grid-cols-1 gap-4">
-                  {teacherAssignmentsForViewing.map((as) => {
-                    const room = classrooms.find(c => c.id === as.classroomId);
-                    const area = areas.find(a => a.id === as.courseId);
+                  {(() => {
+                    // Group assignments by Classroom -> Course
+                    const grouped: Record<string, typeof teacherAssignmentsForViewing> = {};
 
-                    return (
-                      <div key={as.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:shadow-lg transition-all">
-                        <div className="flex items-center gap-6">
-                          <div className="p-4 bg-[#57C5D5]/5 rounded-2xl text-[#57C5D5]">
-                            <Book className="w-6 h-6" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black text-[#57C5D5] uppercase tracking-widest leading-none">
-                              {room?.name || (room ? `${room.grade} ${room.section}` : 'N/A')}
-                            </p>
-                            <h4 className={`text-sm font-black uppercase tracking-tight ${area?.name ? 'text-slate-800' : 'text-slate-400 italic'}`}>
-                              {area?.name || 'Curso No Especificado'}
-                            </h4>
-                            {as.competencyId && area?.competencies && (
-                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 leading-tight">
-                                • {area.competencies.find(c => c.id === as.competencyId?.toString())?.name || 'Competencia Desconocida'}
+                    teacherAssignmentsForViewing.forEach(as => {
+                      const key = `${as.classroomId}-${as.courseId}`;
+                      if (!grouped[key]) grouped[key] = [];
+                      grouped[key].push(as);
+                    });
+
+                    if (Object.keys(grouped).length === 0) {
+                      return (
+                        <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-slate-100">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No hay asignaciones registradas</p>
+                        </div>
+                      );
+                    }
+
+                    return Object.values(grouped).map(group => {
+                      const firstAs = group[0];
+                      const room = classrooms.find(c => c.id === firstAs.classroomId);
+                      const area = areas.find(a => a.id === firstAs.courseId);
+                      const totalHours = group.reduce((sum, g) => sum + g.hoursPerWeek, 0);
+
+                      return (
+                        <div key={`${firstAs.classroomId}-${firstAs.courseId}`} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-start justify-between group hover:shadow-lg transition-all">
+                          <div className="flex items-start gap-6">
+                            <div className="p-4 bg-[#57C5D5]/5 rounded-2xl text-[#57C5D5] mt-1">
+                              <Book className="w-6 h-6" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-[#57C5D5] uppercase tracking-widest leading-none">
+                                {room?.name || (room ? `${room.grade} ${room.section}` : 'N/A')}
                               </p>
-                            )}
-                            <div className="flex items-center gap-3 mt-1.5">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                <Clock className="w-3 h-3" /> {as.hoursPerWeek} Horas semanales
-                              </span>
+                              <h4 className={`text-sm font-black uppercase tracking-tight ${area?.name ? 'text-slate-800' : 'text-slate-400 italic'}`}>
+                                {area?.name || 'Curso No Especificado'}
+                              </h4>
+
+                              {group.length > 0 && group.some(g => g.competencyId) ? (
+                                <div className="space-y-1 pt-1">
+                                  {group.map(g => (
+                                    g.competencyId && area?.competencies && (
+                                      <p key={g.id} className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-tight flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                                        {area.competencies.find(c => c.id === g.competencyId?.toString())?.name || 'Competencia Desconocida'}
+                                      </p>
+                                    )
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              <div className="flex items-center gap-3 mt-2.5">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                  <Clock className="w-3 h-3" /> {totalHours} Horas semanales
+                                </span>
+                              </div>
                             </div>
                           </div>
+                          <div className="flex flex-col gap-2">
+                            {group.map(g => (
+                              <button
+                                key={g.id}
+                                onClick={() => handleDelete(g.id)}
+                                title="Eliminar asignación"
+                                className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <button
-                          onClick={() => handleDelete(as.id)}
-                          className="p-3 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  {teacherAssignmentsForViewing.length === 0 && (
-                    <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No hay asignaciones registradas</p>
-                    </div>
-                  )}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
