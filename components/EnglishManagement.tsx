@@ -81,7 +81,7 @@ const EnglishManagement: React.FC = () => {
           regular_classroom:classrooms!students_classroom_id_fkey (grade, section, level),
           english_classroom:classrooms!students_english_classroom_id_fkey (id, grade, section)
         `)
-                .eq('academic_status', 'Matriculado');
+                .eq('academic_status', 'matriculado');
 
             if (error) throw error;
 
