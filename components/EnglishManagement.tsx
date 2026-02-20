@@ -99,7 +99,7 @@ const EnglishManagement: React.FC = () => {
         }
     };
 
-    const handleCreateClassroom = async () => {
+    const handleSaveClassroom = async () => {
         try {
             const normalizedSection = classroomForm.section.trim();
 
@@ -111,7 +111,8 @@ const EnglishManagement: React.FC = () => {
             // Check for duplicates
             const isDuplicate = englishClassrooms.some(c =>
                 c.grade === classroomForm.grade &&
-                c.section.toLowerCase() === normalizedSection.toLowerCase()
+                c.section.toLowerCase() === normalizedSection.toLowerCase() &&
+                c.id !== editingClassroom?.id
             );
 
             if (isDuplicate) {
@@ -119,27 +120,76 @@ const EnglishManagement: React.FC = () => {
                 return;
             }
 
-            const { error } = await supabase
-                .from('classrooms')
-                .insert([{
-                    name: `Inglés ${classroomForm.grade} - ${normalizedSection}`,
-                    grade: classroomForm.grade,
-                    section: normalizedSection,
-                    level: 'Secundaria', // English is only for Secondary for now
-                    capacity: classroomForm.capacity,
-                    is_english_group: true,
-                    active: true,
-                    course_id: null // Will implement course link later if needed
-                }]);
+            if (editingClassroom) {
+                const { error } = await supabase
+                    .from('classrooms')
+                    .update({
+                        name: `Inglés ${classroomForm.grade} - ${normalizedSection}`,
+                        grade: classroomForm.grade,
+                        section: normalizedSection,
+                        capacity: classroomForm.capacity,
+                    })
+                    .eq('id', editingClassroom.id);
+                if (error) throw error;
+                showToast('success', 'Salón actualizado');
+            } else {
+                const { error } = await supabase
+                    .from('classrooms')
+                    .insert([{
+                        name: `Inglés ${classroomForm.grade} - ${normalizedSection}`,
+                        grade: classroomForm.grade,
+                        section: normalizedSection,
+                        level: 'Secundaria',
+                        capacity: classroomForm.capacity,
+                        is_english_group: true,
+                        active: true,
+                        course_id: null
+                    }]);
+                if (error) throw error;
+                showToast('success', 'Salón creado');
+            }
+
+            setShowClassroomModal(false);
+            setEditingClassroom(null);
+            fetchEnglishClassrooms();
+        } catch (error) {
+            console.error('Error saving classroom:', error);
+            showToast('error', 'Error al guardar salón');
+        }
+    };
+
+    const handleDeleteClassroom = async (classroom: EnglishClassroom) => {
+        try {
+            // Check if students are assigned to this classroom
+            const { count, error } = await supabase
+                .from('students')
+                .select('*', { count: 'exact', head: true })
+                .eq('english_classroom_id', classroom.id);
 
             if (error) throw error;
 
-            showToast('success', 'Salón de inglés creado');
-            setShowClassroomModal(false);
+            if (count && count > 0) {
+                showToast('error', `No se puede eliminar: Hay ${count} estudiantes asignados.`);
+                return;
+            }
+
+            if (!window.confirm(`¿Seguro que deseas eliminar el salón ${classroom.grade} - ${classroom.section}?`)) {
+                return;
+            }
+
+            const { error: deleteError } = await supabase
+                .from('classrooms')
+                .delete()
+                .eq('id', classroom.id);
+
+            if (deleteError) throw deleteError;
+
+            showToast('success', 'Salón eliminado');
             fetchEnglishClassrooms();
+
         } catch (error) {
-            console.error('Error creating classroom:', error);
-            showToast('error', 'Error al crear salón');
+            console.error('Error checking/deleting classroom:', error);
+            showToast('error', 'Error al eliminar salón');
         }
     };
 
@@ -418,14 +468,25 @@ const EnglishManagement: React.FC = () => {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => {
-                                            // Implement edit later if needed, mostly user wants create/assign
-                                            showToast('info', 'Edición próximamente');
+                                            setEditingClassroom(classroom);
+                                            setClassroomForm({
+                                                grade: classroom.grade,
+                                                section: classroom.section,
+                                                capacity: classroom.capacity
+                                            });
+                                            setShowClassroomModal(true);
                                         }}
-                                        className="flex-1 py-2 px-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-bold transition-colors"
+                                        className="flex-1 py-2 px-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
                                     >
-                                        Editar
+                                        <Edit2 className="w-4 h-4" /> Editar
                                     </button>
-                                    {/* Delete button could go here */}
+                                    <button
+                                        onClick={() => handleDeleteClassroom(classroom)}
+                                        className="py-2 px-4 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl text-sm font-bold transition-colors flex items-center justify-center"
+                                        title="Eliminar Salón"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -433,12 +494,12 @@ const EnglishManagement: React.FC = () => {
                 </div>
             )}
 
-            {/* Create Classroom Modal */}
+            {/* Create/Edit Classroom Modal */}
             {showClassroomModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-slate-800">Nuevo Grupo de Inglés</h3>
+                            <h3 className="text-xl font-black text-slate-800">{editingClassroom ? 'Editar Grupo' : 'Nuevo Grupo de Inglés'}</h3>
                             <button
                                 onClick={() => setShowClassroomModal(false)}
                                 className="p-2 hover:bg-slate-100 rounded-full transition-colors"
@@ -482,10 +543,10 @@ const EnglishManagement: React.FC = () => {
                             </div>
 
                             <button
-                                onClick={handleCreateClassroom}
+                                onClick={handleSaveClassroom}
                                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all mt-4"
                             >
-                                Crear Grupo
+                                {editingClassroom ? 'Guardar Cambios' : 'Crear Grupo'}
                             </button>
                         </div>
                     </div>
