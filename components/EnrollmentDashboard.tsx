@@ -55,21 +55,8 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           const students = await studentService.getCountByYear(selectedYear.id);
           setStudentCount(students);
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error loading dashboard data:', error);
-        // Force visible error for debugging
-        const errorDiv = document.createElement('div');
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.top = '10px';
-        errorDiv.style.left = '50%';
-        errorDiv.style.transform = 'translateX(-50%)';
-        errorDiv.style.backgroundColor = 'red';
-        errorDiv.style.color = 'white';
-        errorDiv.style.padding = '20px';
-        errorDiv.style.zIndex = '9999';
-        errorDiv.innerText = `DEBUG ERROR: ${error.message || JSON.stringify(error)}`;
-        document.body.appendChild(errorDiv);
-
       } finally {
         setIsLoading(false);
       }
