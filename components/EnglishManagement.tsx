@@ -138,7 +138,8 @@ const EnglishManagement: React.FC = () => {
             // Optimistic update
             setStudents(prev => prev.map(s => {
                 if (s.id === studentId) {
-                    const newClassroom = englishClassrooms.find(c => c.id === englishClassroomId);
+                    // Fix: Compare as strings since ID might be number from DB but string from select
+                    const newClassroom = englishClassrooms.find(c => String(c.id) === String(englishClassroomId));
                     return {
                         ...s,
                         english_classroom: newClassroom ? {
