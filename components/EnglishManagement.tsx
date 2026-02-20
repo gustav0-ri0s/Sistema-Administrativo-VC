@@ -101,12 +101,30 @@ const EnglishManagement: React.FC = () => {
 
     const handleCreateClassroom = async () => {
         try {
+            const normalizedSection = classroomForm.section.trim();
+
+            if (!normalizedSection) {
+                showToast('error', 'El nombre de la sección es requerido');
+                return;
+            }
+
+            // Check for duplicates
+            const isDuplicate = englishClassrooms.some(c =>
+                c.grade === classroomForm.grade &&
+                c.section.toLowerCase() === normalizedSection.toLowerCase()
+            );
+
+            if (isDuplicate) {
+                showToast('error', `Ya existe un grupo ${classroomForm.grade} - ${normalizedSection}`);
+                return;
+            }
+
             const { error } = await supabase
                 .from('classrooms')
                 .insert([{
-                    name: `Inglés ${classroomForm.grade} - ${classroomForm.section}`,
+                    name: `Inglés ${classroomForm.grade} - ${normalizedSection}`,
                     grade: classroomForm.grade,
-                    section: classroomForm.section,
+                    section: normalizedSection,
                     level: 'Secundaria', // English is only for Secondary for now
                     capacity: classroomForm.capacity,
                     is_english_group: true,
@@ -444,17 +462,13 @@ const EnglishManagement: React.FC = () => {
 
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Nivel (Sección)</label>
-                                <select
+                                <input
+                                    type="text"
                                     value={classroomForm.section}
+                                    placeholder="Ej: A1, A1+, B1..."
                                     onChange={(e) => setClassroomForm({ ...classroomForm, section: e.target.value })}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                                >
-                                    <option value="A1">A1</option>
-                                    <option value="A1+">A1+</option>
-                                    <option value="A2">A2</option>
-                                    <option value="A2+">A2+</option>
-                                    <option value="B1">B1</option>
-                                </select>
+                                />
                             </div>
 
                             <div>
