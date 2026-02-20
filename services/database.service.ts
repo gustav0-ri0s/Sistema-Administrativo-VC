@@ -122,6 +122,19 @@ export const profileService = {
         return data;
     },
 
+    async adminDeleteUser(profile_id: string) {
+        console.log('profileService: adminDeleteUser() called for', profile_id);
+        const { data, error } = await supabase.functions.invoke('admin-auth-handler', {
+            body: { action: 'delete_user', profile_id }
+        });
+
+        if (error) {
+            console.error('profileService: adminDeleteUser() error:', error);
+            throw error;
+        }
+        return data;
+    },
+
     async getTeachers() {
         console.log('profileService: getTeachers() called');
         const { data, error } = await supabase

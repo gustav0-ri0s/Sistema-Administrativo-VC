@@ -286,6 +286,28 @@ const ProfileManagement: React.FC = () => {
     }
   };
 
+  const handleDeleteProfile = async (profile: Profile) => {
+    if (!window.confirm(`¿Está seguro de que desea ELIMINAR al usuario "${profile.full_name}"?\nEsta acción es irreversible y bloqueará su acceso inmediatamente.`)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log('ProfileManagement: Deleting user...', profile.id);
+
+      // Call admin delete handler via service
+      await profileService.adminDeleteUser(profile.id);
+
+      showToast('success', 'Usuario eliminado exitosamente.');
+      fetchData(); // Refresh list
+    } catch (error: any) {
+      console.error('ProfileManagement: Delete error:', error);
+      showToast('error', error.message || 'Error al eliminar el usuario.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const filteredProfiles = profiles
     .filter(p => {
       const matchesSearch = p.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -456,6 +478,13 @@ const ProfileManagement: React.FC = () => {
                             title="Editar"
                           >
                             <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProfile(profile)}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            title="Eliminar Personal"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
