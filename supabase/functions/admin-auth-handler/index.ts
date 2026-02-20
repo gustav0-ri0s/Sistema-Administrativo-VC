@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
         }
 
         if (action === "update_password") {
+            const { profile_id, password } = body; // Destructure here to ensure scope access
             console.log(`Edge Function: Updating password for ${profile_id}`);
             const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
                 profile_id,
@@ -85,6 +86,26 @@ Deno.serve(async (req) => {
             }
 
             return new Response(JSON.stringify({ message: "Password updated successfully", data: updateData }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+
+        if (action === "delete_user") {
+            const { profile_id } = body;
+            console.log(`Edge Function: Deleting user ${profile_id}`);
+
+            // Delete from Auth (Cascade should handle profile, or we delete profile manually if no cascade)
+            const { data, error } = await supabaseAdmin.auth.admin.deleteUser(
+                profile_id
+            );
+
+            if (error) {
+                console.error("Edge Function: Delete user error", error);
+                throw error;
+            }
+
+            return new Response(JSON.stringify({ message: "User deleted successfully", data }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });

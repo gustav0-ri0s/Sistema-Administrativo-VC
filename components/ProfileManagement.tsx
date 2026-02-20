@@ -50,10 +50,10 @@ const ProfileManagement: React.FC = () => {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [loadingDni, setLoadingDni] = useState(false);
   const [newProfile, setNewProfile] = useState<Partial<Profile>>({
-    role: UserRole.DOCENTE,
     active: true,
     force_password_change: true
   });
+  const [deletingProfile, setDeletingProfile] = useState<Profile | null>(null);
 
   const { showToast } = useToast();
 
@@ -286,7 +286,31 @@ const ProfileManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteProfile = async (profile: Profile) => {
+  const handleDeleteProfile = (profile: Profile) => {
+    setDeletingProfile(profile);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingProfile) return;
+
+    try {
+      setIsUpdating(true);
+      console.log('ProfileManagement: Deleting user...', deletingProfile.id);
+
+      await profileService.adminDeleteUser(deletingProfile.id);
+
+      showToast('success', 'Usuario eliminado exitosamente.');
+      setDeletingProfile(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('ProfileManagement: Delete error:', error);
+      showToast('error', error.message || 'Error al eliminar el usuario.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteProfileOld = async (profile: Profile) => {
     if (!window.confirm(`¿Está seguro de que desea ELIMINAR al usuario "${profile.full_name}"?\nEsta acción es irreversible y bloqueará su acceso inmediatamente.`)) {
       return;
     }
@@ -1001,6 +1025,42 @@ const ProfileManagement: React.FC = () => {
           </div>
         )
       }
+
+      {deletingProfile && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center space-y-4">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800">¿Eliminar Usuario?</h3>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                Estás a punto de eliminar a <strong className="text-slate-800">{deletingProfile.full_name}</strong> ({ROLE_LABELS[deletingProfile.role]}).
+                <br /><br />
+                <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg text-xs">⚠️ Esta acción es irreversible</span>
+                <br /><br />
+                El usuario perderá el acceso al sistema inmediatamente.
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button
+                disabled={isUpdating}
+                onClick={() => setDeletingProfile(null)}
+                className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={isUpdating}
+                onClick={confirmDelete}
+                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-500/20 hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+              >
+                {isUpdating ? <><Loader2 className="w-4 h-4 animate-spin" /> Eliminando...</> : 'Sí, Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };
