@@ -147,7 +147,7 @@ export const profileService = {
 
         if (error) {
             console.error('profileService: getActiveCount() error:', error);
-            return 0;
+            throw error;
         }
         return count || 0;
     }

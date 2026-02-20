@@ -30,12 +30,17 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
+        // Debug connection availability
+        console.log('Dashboard: Starting data fetch...');
+
         const [recent, stats, staff, classroomsData] = await Promise.all([
           incidentService.getRecent(),
           incidentService.getStats(),
           profileService.getActiveCount(),
           classroomService.getAll()
         ]);
+
+        console.log('Dashboard: Data fetched:', { recent, stats, staff, classroomsData });
 
         if (recent) {
           setActiveIncidents(recent);
@@ -50,8 +55,21 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           const students = await studentService.getCountByYear(selectedYear.id);
           setStudentCount(students);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading dashboard data:', error);
+        // Force visible error for debugging
+        const errorDiv = document.createElement('div');
+        errorDiv.style.position = 'fixed';
+        errorDiv.style.top = '10px';
+        errorDiv.style.left = '50%';
+        errorDiv.style.transform = 'translateX(-50%)';
+        errorDiv.style.backgroundColor = 'red';
+        errorDiv.style.color = 'white';
+        errorDiv.style.padding = '20px';
+        errorDiv.style.zIndex = '9999';
+        errorDiv.innerText = `DEBUG ERROR: ${error.message || JSON.stringify(error)}`;
+        document.body.appendChild(errorDiv);
+
       } finally {
         setIsLoading(false);
       }
