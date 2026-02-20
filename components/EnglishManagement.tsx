@@ -139,7 +139,7 @@ const EnglishManagement: React.FC = () => {
                         name: `Inglés ${classroomForm.grade} - ${normalizedSection}`,
                         grade: classroomForm.grade,
                         section: normalizedSection,
-                        level: 'Secundaria',
+                        level: 'secundaria',
                         capacity: classroomForm.capacity,
                         is_english_group: true,
                         active: true,
