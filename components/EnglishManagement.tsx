@@ -78,8 +78,8 @@ const EnglishManagement: React.FC = () => {
                 .from('students')
                 .select(`
           *,
-          regular_classroom:classrooms!classroom_id (grade, section, level),
-          english_classroom:classrooms!english_classroom_id (id, grade, section)
+          regular_classroom:classrooms!students_classroom_id_fkey (grade, section, level),
+          english_classroom:classrooms!students_english_classroom_id_fkey (id, grade, section)
         `)
                 .eq('academic_status', 'Matriculado');
 
@@ -197,8 +197,8 @@ const EnglishManagement: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('assignment')}
                         className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'assignment'
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'text-slate-600 hover:bg-slate-50'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         <Users className="w-4 h-4 inline-block mr-2" />
@@ -207,8 +207,8 @@ const EnglishManagement: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('classrooms')}
                         className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'classrooms'
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'text-slate-600 hover:bg-slate-50'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         <BookOpen className="w-4 h-4 inline-block mr-2" />
@@ -308,7 +308,7 @@ const EnglishManagement: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${cycle === 'Ciclo VI' ? 'bg-indigo-100 text-indigo-700' :
-                                                            cycle === 'Ciclo VII' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                                                        cycle === 'Ciclo VII' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
                                                         }`}>
                                                         {cycle || 'N/A'}
                                                     </span>
@@ -318,8 +318,8 @@ const EnglishManagement: React.FC = () => {
                                                         value={student.english_classroom_id || ''}
                                                         onChange={(e) => handleAssignStudent(student.id, e.target.value || null)}
                                                         className={`w-full max-w-[180px] px-3 py-2 text-sm rounded-lg border focus:ring-2 outline-none transition-all ${student.english_classroom_id
-                                                                ? 'bg-green-50 border-green-200 text-green-700 focus:ring-green-500'
-                                                                : 'bg-white border-slate-200 text-slate-600 focus:ring-blue-500'
+                                                            ? 'bg-green-50 border-green-200 text-green-700 focus:ring-green-500'
+                                                            : 'bg-white border-slate-200 text-slate-600 focus:ring-blue-500'
                                                             }`}
                                                     >
                                                         <option value="">Sin Asignar</option>
