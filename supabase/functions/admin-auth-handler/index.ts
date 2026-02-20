@@ -118,7 +118,10 @@ Deno.serve(async (req) => {
             const { profile_id } = body;
             console.log(`Edge Function: Deleting user ${profile_id}`);
 
-            // 1. Explicitly delete from 'profiles' table first to ensure data consistency
+            let dbDeleted = false;
+            let authDeleted = false;
+
+            // 1. Delete from Profiles
             const { error: dbError } = await supabaseAdmin
                 .from('profiles')
                 .delete()
@@ -126,20 +129,45 @@ Deno.serve(async (req) => {
 
             if (dbError) {
                 console.error("Edge Function: DB Delete error", dbError);
-                // Continue to try deleting Auth user anyway, but log warning
+                // Return immediate error if DB fails (e.g. FK constraints)
+                return new Response(JSON.stringify({ error: `Cannot delete profile: ${dbError.message}` }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 400,
+                });
+            } else {
+                dbDeleted = true;
             }
 
-            // 2. Delete from Auth
-            const { data, error } = await supabaseAdmin.auth.admin.deleteUser(
-                profile_id
-            );
+            // 2. Delete from Auth (Idempotent)
+            try {
+                const { data, error } = await supabaseAdmin.auth.admin.deleteUser(
+                    profile_id
+                );
 
-            if (error) {
-                console.error("Edge Function: Auth Delete user error", error);
-                throw error;
+                if (error) {
+                    console.error("Edge Function: Auth Delete user error", error);
+                    throw error;
+                }
+                authDeleted = true;
+            } catch (authErr: any) {
+                console.log("Auth delete failed, checking if user already gone...");
+                // Verify if user is actually gone
+                const { data: userData, error: checkError } = await supabaseAdmin.auth.admin.getUserById(profile_id);
+
+                if (checkError || !userData?.user) {
+                    console.log("User already gone from Auth. Treating as success.");
+                    authDeleted = true;
+                } else {
+                    console.error("User still exists in Auth but delete failed:", authErr);
+                    // Don't throw, just report it
+                }
             }
 
-            return new Response(JSON.stringify({ message: "User deleted successfully", data }), {
+            return new Response(JSON.stringify({
+                message: "User deletion process completed",
+                dbDeleted,
+                authDeleted
+            }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });
