@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useToast } from '../contexts/ToastContext';
-import { Classroom, Student } from '../types';
+import { Classroom, Student, AcademicStatus } from '../types';
 
 interface EnglishClassroom extends Classroom {
     student_count?: number;
@@ -81,7 +81,7 @@ const EnglishManagement: React.FC = () => {
           regular_classroom:classrooms!students_classroom_id_fkey (grade, section, level),
           english_classroom:classrooms!students_english_classroom_id_fkey (id, grade, section)
         `)
-                .eq('academic_status', 'matriculado');
+                .eq('academic_status', AcademicStatus.MATRICULADO);
 
             if (error) throw error;
 

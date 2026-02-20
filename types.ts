@@ -9,12 +9,12 @@ export enum UserRole {
 }
 
 export enum AcademicStatus {
-  ACTIVO = 'Activo',
-  TRASLADADO = 'Trasladado',
-  RETIRADO = 'Retirado',
-  RESERVA = 'Reserva',
-  MATRICULADO = 'Matriculado',
-  SIN_MATRICULA = 'Sin Matrícula'
+  ACTIVO = 'activo',
+  TRASLADADO = 'trasladado',
+  RETIRADO = 'retirado',
+  RESERVA = 'reserva',
+  MATRICULADO = 'matriculado',
+  SIN_MATRICULA = 'sin_matricula'
 }
 
 export type YearStatus = 'abierto' | 'cerrado' | 'planificación';
