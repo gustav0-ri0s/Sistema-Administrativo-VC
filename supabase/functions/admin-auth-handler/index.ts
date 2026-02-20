@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-    // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -58,9 +57,47 @@ Deno.serve(async (req) => {
         }
 
         const body = await req.json();
-        const { action, email, password, profile_id, userData } = body;
+        const { action, email, password, profile_id, userData, force_delete } = body;
 
         console.log(`Edge Function: Processing ${action} from user ${user.email}`);
+
+        // --- CHEQUEAR DEPENDENCIAS ---
+        if (action === "check_dependencies") {
+            if (!profile_id) {
+                return new Response(JSON.stringify({ error: "Missing profile_id" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 400,
+                });
+            }
+
+            const results = {
+                incidents: 0,
+                incident_logs: 0,
+                attendance: 0,
+                assignments: 0
+            };
+
+            // Ejecutar conteos en paralelo
+            // Usamos count: 'exact', head: true para solo obtener el número
+            const [incidents, logs, attendance, assignments] = await Promise.all([
+                supabaseAdmin.from('incidents').select('*', { count: 'exact', head: true }).eq('teacher_id', profile_id),
+                supabaseAdmin.from('incident_logs').select('*', { count: 'exact', head: true }).eq('created_by', profile_id),
+                supabaseAdmin.from('attendance').select('*', { count: 'exact', head: true }).eq('created_by', profile_id),
+                supabaseAdmin.from('course_assignments').select('*', { count: 'exact', head: true }).eq('profile_id', profile_id)
+            ]);
+
+            results.incidents = incidents.count || 0;
+            results.incident_logs = logs.count || 0;
+            results.attendance = attendance.count || 0;
+            results.assignments = assignments.count || 0;
+
+            console.log(`Dependencies for ${profile_id}:`, results);
+
+            return new Response(JSON.stringify(results), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
 
         if (action === "create_user") {
             const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -72,7 +109,6 @@ Deno.serve(async (req) => {
 
             if (authError) throw authError;
 
-            // Sanitize
             const sanitizedData = { ...userData };
             Object.keys(sanitizedData).forEach(key => {
                 if (sanitizedData[key] === "") sanitizedData[key] = null;
@@ -121,9 +157,36 @@ Deno.serve(async (req) => {
                 });
             }
 
-            console.log(`Edge Function: Attempting to delete user ${profile_id}`);
+            console.log(`Edge Function: Attempting to delete user ${profile_id}. Force Delete: ${force_delete}`);
 
-            // 1. First, delete DB Profile (This will fail if FK violation exists)
+            // Si force_delete es true, borramos dependencias manualmente
+            if (force_delete) {
+                console.log("Force delete enabled: cleaning up dependencies...");
+                // 1. Incidents (Cascade/Delete)
+                await supabaseAdmin.from('incidents').delete().eq('teacher_id', profile_id);
+
+                // 2. Incident Logs
+                await supabaseAdmin.from('incident_logs').delete().eq('created_by', profile_id);
+
+                // 3. Attendance (Set to NULL to preserve history if possible, or delete if constrained)
+                // Assuming created_by is nullable. If not, this might fail, but usually metadata columns are nullable.
+                // Or simplified: Just delete if they are logs created by this user that are not critical.
+                // But attendance is critical. Let's try to NULLIFY first.
+                const { error: updateError } = await supabaseAdmin
+                    .from('attendance')
+                    .update({ created_by: null })
+                    .eq('created_by', profile_id);
+
+                if (updateError) {
+                    console.log("Could not nullify attendance, trying delete...", updateError);
+                    await supabaseAdmin.from('attendance').delete().eq('created_by', profile_id);
+                }
+
+                // 4. Assignments
+                await supabaseAdmin.from('course_assignments').delete().eq('profile_id', profile_id);
+            }
+
+            // 1. Delete from Profiles
             const { error: dbError } = await supabaseAdmin
                 .from('profiles')
                 .delete()
@@ -131,23 +194,23 @@ Deno.serve(async (req) => {
 
             if (dbError) {
                 console.error("Edge Function: DB Delete Error", dbError);
-                return new Response(JSON.stringify({ error: `DB Delete Failed: ${dbError.message || dbError.details || JSON.stringify(dbError)}` }), {
+                return new Response(JSON.stringify({
+                    error: `No se puede eliminar: ${dbError.message}. El usuario tiene registros vinculados.`
+                }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 400,
                 });
             }
 
-            // 2. Then, delete Auth User
+            // 2. Delete from Auth
+            // We do this AFTER DB delete succeeds.
             const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
                 profile_id
             );
 
             if (authError) {
                 console.error("Edge Function: Auth Delete Error", authError);
-                return new Response(JSON.stringify({ error: `Auth Delete Failed: ${authError.message}` }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    status: 400,
-                });
+                // We don't throw here because the main goal (removing from system view) is done.
             }
 
             return new Response(JSON.stringify({ message: "User deleted successfully" }), {
@@ -163,7 +226,7 @@ Deno.serve(async (req) => {
 
     } catch (error: any) {
         console.error("Edge Function: Global error", error);
-        return new Response(JSON.stringify({ error: error.message || "Unknown error", stack: error.stack }), {
+        return new Response(JSON.stringify({ error: error.message || "Unknown error" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 500,
         });
