@@ -514,7 +514,7 @@ export const classroomService = {
                 .from('classrooms')
                 .select(`
                     *,
-                    students (id)
+                    students:students!students_classroom_id_fkey (id)
                 `)
                 .order('level', { ascending: true })
                 .order('grade', { ascending: true })
