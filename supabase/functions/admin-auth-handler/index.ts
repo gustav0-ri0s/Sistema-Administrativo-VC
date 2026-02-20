@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
     }
 
     try {
-        // 1. Create Admin Client
         const supabaseAdmin = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -26,7 +25,7 @@ Deno.serve(async (req) => {
             }
         );
 
-        // 2. Check Authorization
+        // Authorization Check
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
             return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
@@ -73,7 +72,7 @@ Deno.serve(async (req) => {
 
             if (authError) throw authError;
 
-            // Sanitize userData
+            // Sanitize
             const sanitizedData = { ...userData };
             Object.keys(sanitizedData).forEach(key => {
                 if (sanitizedData[key] === "") sanitizedData[key] = null;
@@ -115,59 +114,43 @@ Deno.serve(async (req) => {
         }
 
         if (action === "delete_user") {
-            const { profile_id } = body;
-            console.log(`Edge Function: Deleting user ${profile_id}`);
+            if (!profile_id) {
+                return new Response(JSON.stringify({ error: "Missing profile_id" }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 400,
+                });
+            }
 
-            let dbDeleted = false;
-            let authDeleted = false;
+            console.log(`Edge Function: Attempting to delete user ${profile_id}`);
 
-            // 1. Delete from Profiles
+            // 1. First, delete DB Profile (This will fail if FK violation exists)
             const { error: dbError } = await supabaseAdmin
                 .from('profiles')
                 .delete()
                 .eq('id', profile_id);
 
             if (dbError) {
-                console.error("Edge Function: DB Delete error", dbError);
-                // Return immediate error if DB fails (e.g. FK constraints)
-                return new Response(JSON.stringify({ error: `Cannot delete profile: ${dbError.message}` }), {
+                console.error("Edge Function: DB Delete Error", dbError);
+                return new Response(JSON.stringify({ error: `DB Delete Failed: ${dbError.message || dbError.details || JSON.stringify(dbError)}` }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 400,
                 });
-            } else {
-                dbDeleted = true;
             }
 
-            // 2. Delete from Auth (Idempotent)
-            try {
-                const { data, error } = await supabaseAdmin.auth.admin.deleteUser(
-                    profile_id
-                );
+            // 2. Then, delete Auth User
+            const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
+                profile_id
+            );
 
-                if (error) {
-                    console.error("Edge Function: Auth Delete user error", error);
-                    throw error;
-                }
-                authDeleted = true;
-            } catch (authErr: any) {
-                console.log("Auth delete failed, checking if user already gone...");
-                // Verify if user is actually gone
-                const { data: userData, error: checkError } = await supabaseAdmin.auth.admin.getUserById(profile_id);
-
-                if (checkError || !userData?.user) {
-                    console.log("User already gone from Auth. Treating as success.");
-                    authDeleted = true;
-                } else {
-                    console.error("User still exists in Auth but delete failed:", authErr);
-                    // Don't throw, just report it
-                }
+            if (authError) {
+                console.error("Edge Function: Auth Delete Error", authError);
+                return new Response(JSON.stringify({ error: `Auth Delete Failed: ${authError.message}` }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 400,
+                });
             }
 
-            return new Response(JSON.stringify({
-                message: "User deletion process completed",
-                dbDeleted,
-                authDeleted
-            }), {
+            return new Response(JSON.stringify({ message: "User deleted successfully" }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });
@@ -180,7 +163,7 @@ Deno.serve(async (req) => {
 
     } catch (error: any) {
         console.error("Edge Function: Global error", error);
-        return new Response(JSON.stringify({ error: error.message || "Unknown error" }), {
+        return new Response(JSON.stringify({ error: error.message || "Unknown error", stack: error.stack }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 500,
         });
