@@ -317,11 +317,14 @@ const EnglishManagement: React.FC = () => {
                         >
                             <option value="todos">Todos los Niveles</option>
                             <option value="sin_asignar">Sin Asignar</option>
-                            <option value="A1">Nivel A1</option>
-                            <option value="A1+">Nivel A1+</option>
-                            <option value="A2">Nivel A2</option>
-                            <option value="A2+">Nivel A2+</option>
-                            <option value="B1">Nivel B1</option>
+                            {Array.from(new Set(englishClassrooms.map(c => c.section)))
+                                .sort()
+                                .map(section => (
+                                    <option key={section} value={section}>
+                                        Nivel {section}
+                                    </option>
+                                ))
+                            }
                         </select>
                     </div>
 
