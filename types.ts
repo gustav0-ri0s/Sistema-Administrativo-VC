@@ -5,7 +5,8 @@ export enum UserRole {
   DOCENTE = 'docente',
   AUXILIAR = 'auxiliar',
   SECRETARIA = 'secretaria',
-  SUPERVISOR = 'supervisor'
+  SUPERVISOR = 'supervisor',
+  PSICOLOGA = 'psicologa'
 }
 
 export enum AcademicStatus {
@@ -169,7 +170,20 @@ export interface AcademicYearContextType {
 }
 
 export interface RolePermission {
-  role: UserRole;
+  role: string | UserRole;
   modules: string[];
   updated_at?: string;
+}
+
+export interface PortalModule {
+  id?: number;
+  role: string | UserRole;
+  module_key: string;
+  module_title: string;
+  module_description?: string;
+  module_url: string;
+  module_color?: string;
+  display_order?: number;
+  active: boolean;
+  return_to?: string;
 }

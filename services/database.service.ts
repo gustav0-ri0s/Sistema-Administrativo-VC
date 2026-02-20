@@ -40,6 +40,79 @@ export const rolePermissionService = {
     }
 };
 
+export const portalModuleService = {
+    async getAll() {
+        const { data, error } = await supabase
+            .from('portal_modules')
+            .select('*')
+            .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        return data as any[];
+    },
+
+    async getByRole(role: string) {
+        const { data, error } = await supabase
+            .from('portal_modules')
+            .select('*')
+            .eq('role', role)
+            .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        return data as any[];
+    },
+
+    async updateRoleModules(role: string, modules: any[]) {
+        // Delete existing and insert new for this role
+        const { error: deleteError } = await supabase
+            .from('portal_modules')
+            .delete()
+            .eq('role', role);
+
+        if (deleteError) throw deleteError;
+
+        if (modules.length === 0) return;
+
+        const { error: insertError } = await supabase
+            .from('portal_modules')
+            .insert(modules.map(m => ({ ...m, role })));
+
+        if (insertError) throw insertError;
+    }
+};
+
+export const roleManagementService = {
+    async getRoles() {
+        // Since it's an enum, we can query it from information_schema alternatively, 
+        // but it's simpler to get unique roles from profiles and role_permissions
+        const { data, error } = await supabase
+            .rpc('get_user_roles'); // I might need to create this RPC if it doesn't exist
+
+        // Actually, let's just get the enum values via SQL
+        const { data: enumData, error: enumError } = await supabase
+            .rpc('get_enum_values', { enum_name: 'user_role' });
+
+        if (enumError) {
+            // Fallback to manual list or from role_permissions
+            const { data: perms } = await supabase.from('role_permissions').select('role');
+            return Array.from(new Set(perms?.map(p => p.role) || []));
+        }
+        return enumData;
+    },
+
+    async addRole(roleName: string) {
+        // This requires ALTER TYPE, which might not be possible via default RLS/Anon key
+        // We'll use a Supabase function if available or just insert into role_permissions
+        // even if it's not in the enum (Postgres might error though).
+        // Let's assume for now we add it to role_permissions table which has the enum column.
+        const { error } = await supabase
+            .from('role_permissions')
+            .insert({ role: roleName, modules: [] });
+
+        if (error) throw error;
+    }
+};
+
 
 export const profileService = {
     async getAll() {

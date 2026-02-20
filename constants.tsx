@@ -13,7 +13,8 @@ import {
   Library,
   ClipboardList,
   Layers,
-  Languages
+  Languages,
+  Stethoscope
 } from 'lucide-react';
 import { UserRole } from './types';
 
@@ -24,6 +25,7 @@ export const ROLE_ICONS: Record<string, React.ReactNode> = {
   [UserRole.AUXILIAR]: <Users className="w-5 h-5 text-amber-600" />,
   [UserRole.SECRETARIA]: <Briefcase className="w-5 h-5 text-purple-600" />,
   [UserRole.SUPERVISOR]: <ShieldCheck className="w-5 h-5 text-blue-600" />,
+  [UserRole.PSICOLOGA]: <Stethoscope className="w-5 h-5 text-pink-600" />,
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -33,6 +35,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.AUXILIAR]: 'Auxiliar',
   [UserRole.SECRETARIA]: 'Secretaria',
   [UserRole.SUPERVISOR]: 'Supervisor',
+  [UserRole.PSICOLOGA]: 'Psicología',
 };
 
 export const NAVIGATION_ITEMS = [
