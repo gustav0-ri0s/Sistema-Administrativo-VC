@@ -142,8 +142,7 @@ const EnglishManagement: React.FC = () => {
                         level: 'secundaria',
                         capacity: classroomForm.capacity,
                         is_english_group: true,
-                        active: true,
-                        course_id: null
+                        active: true
                     }]);
                 if (error) throw error;
                 showToast('success', 'Salón creado');
