@@ -122,14 +122,27 @@ export const profileService = {
         return data;
     },
 
-    async adminDeleteUser(profile_id: string) {
-        console.log('profileService: adminDeleteUser() called for', profile_id);
+    async adminDeleteUser(profile_id: string, force_delete: boolean = false) {
+        console.log('profileService: adminDeleteUser() called for', profile_id, 'force:', force_delete);
         const { data, error } = await supabase.functions.invoke('admin-auth-handler', {
-            body: { action: 'delete_user', profile_id }
+            body: { action: 'delete_user', profile_id, force_delete }
         });
 
         if (error) {
             console.error('profileService: adminDeleteUser() error:', error);
+            throw error;
+        }
+        return data;
+    },
+
+    async checkDependencies(profile_id: string) {
+        console.log('profileService: checkDependencies() called for', profile_id);
+        const { data, error } = await supabase.functions.invoke('admin-auth-handler', {
+            body: { action: 'check_dependencies', profile_id }
+        });
+
+        if (error) {
+            console.error('profileService: checkDependencies() error:', error);
             throw error;
         }
         return data;

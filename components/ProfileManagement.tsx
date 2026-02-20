@@ -8,7 +8,7 @@ import {
   Phone, Mail, Calendar as CalendarIcon, Shield,
   CheckCircle2, XCircle, MoreVertical, Loader2,
   X, Save, Eye, EyeOff, RefreshCw, Mars, Venus,
-  ShieldCheck, ArrowRight, UserCheck
+  ShieldCheck, ArrowRight, UserCheck, AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import AssignmentPanel from './AssignmentPanel';
@@ -54,6 +54,8 @@ const ProfileManagement: React.FC = () => {
     force_password_change: true
   });
   const [deletingProfile, setDeletingProfile] = useState<Profile | null>(null);
+  const [deleteDependencies, setDeleteDependencies] = useState<any>(null);
+  const [loadingDependencies, setLoadingDependencies] = useState(false);
 
   const { showToast } = useToast();
 
@@ -286,8 +288,19 @@ const ProfileManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteProfile = (profile: Profile) => {
+  const handleDeleteProfile = async (profile: Profile) => {
     setDeletingProfile(profile);
+    setLoadingDependencies(true);
+    setDeleteDependencies(null);
+    try {
+      const deps = await profileService.checkDependencies(profile.id);
+      setDeleteDependencies(deps);
+    } catch (error) {
+      console.error('Error checking dependencies', error);
+      // Fallback: assume no dependencies or let user proceed with caution
+    } finally {
+      setLoadingDependencies(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -297,7 +310,14 @@ const ProfileManagement: React.FC = () => {
       setIsUpdating(true);
       console.log('ProfileManagement: Deleting user...', deletingProfile.id);
 
-      await profileService.adminDeleteUser(deletingProfile.id);
+      const force_delete = deleteDependencies && (
+        deleteDependencies.incidents > 0 ||
+        deleteDependencies.incident_logs > 0 ||
+        deleteDependencies.attendance > 0 ||
+        deleteDependencies.assignments > 0
+      );
+
+      await profileService.adminDeleteUser(deletingProfile.id, force_delete);
 
       showToast('success', 'Usuario eliminado exitosamente.');
       setDeletingProfile(null);
@@ -1037,9 +1057,32 @@ const ProfileManagement: React.FC = () => {
               <p className="text-slate-500 text-sm font-medium leading-relaxed">
                 Estás a punto de eliminar a <strong className="text-slate-800">{deletingProfile.full_name}</strong> ({ROLE_LABELS[deletingProfile.role]}).
                 <br /><br />
-                <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg text-xs">⚠️ Esta acción es irreversible</span>
-                <br /><br />
-                El usuario perderá el acceso al sistema inmediatamente.
+                {loadingDependencies ? (
+                  <span className="flex items-center justify-center gap-2 text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Verificando registros vinculados...
+                  </span>
+                ) : deleteDependencies && (Object.values(deleteDependencies).some(v => Number(v) > 0)) ? (
+                  <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl text-left text-xs mb-4">
+                    <strong className="block text-amber-700 mb-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Advertencia: Datos Vinculados
+                    </strong>
+                    <ul className="space-y-1 text-amber-800 list-disc list-inside">
+                      {deleteDependencies.incidents > 0 && <li>{deleteDependencies.incidents} Incidencias reportadas (se eliminarán)</li>}
+                      {deleteDependencies.incident_logs > 0 && <li>{deleteDependencies.incident_logs} Registros en bitácora (se eliminarán)</li>}
+                      {deleteDependencies.assignments > 0 && <li>{deleteDependencies.assignments} Asignaciones de cursos (se eliminarán)</li>}
+                      {deleteDependencies.attendance > 0 && <li>{deleteDependencies.attendance} Registros de asistencia (se desvincularán)</li>}
+                    </ul>
+                    <p className="mt-2 text-amber-600 font-bold">
+                      Si continúas, estos registros serán eliminados o desvinculados permanentemente.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded-lg text-xs">⚠️ Esta acción es irreversible</span>
+                    <br /><br />
+                    El usuario perderá el acceso al sistema inmediatamente.
+                  </>
+                )}
               </p>
             </div>
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
@@ -1051,7 +1094,7 @@ const ProfileManagement: React.FC = () => {
                 Cancelar
               </button>
               <button
-                disabled={isUpdating}
+                disabled={isUpdating || loadingDependencies}
                 onClick={confirmDelete}
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-500/20 hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
               >
