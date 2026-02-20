@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     }
 
     try {
-        // 1. Create Admin Client (Service Role) - For performing the action
+        // 1. Create Admin Client
         const supabaseAdmin = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
             }
         );
 
-        // 2. Check Authorization Header manually (Alternative to verify_jwt=true)
+        // 2. Check Authorization
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
             return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
@@ -35,7 +35,6 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 3. Verify the User (Optional but recommended: Check if requester is Admin)
         const token = authHeader.replace('Bearer ', '');
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
@@ -46,14 +45,13 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Check if user is admin (using public.profiles table)
         const { data: profile } = await supabaseAdmin
             .from('profiles')
             .select('role')
             .eq('id', user.id)
             .single();
 
-        if (profile?.role !== 'admin' && profile?.role !== 'subdirector') { // Allow subdirector too if needed
+        if (profile?.role !== 'admin' && profile?.role !== 'subdirector') {
             return new Response(JSON.stringify({ error: "Unauthorized: Insufficient permissions" }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 403,
@@ -73,10 +71,7 @@ Deno.serve(async (req) => {
                 user_metadata: { full_name: userData?.full_name },
             });
 
-            if (authError) {
-                console.error("Edge Function: Auth error", authError);
-                throw authError;
-            }
+            if (authError) throw authError;
 
             // Sanitize userData
             const sanitizedData = { ...userData };
@@ -96,10 +91,7 @@ Deno.serve(async (req) => {
                 .select()
                 .single();
 
-            if (profileError) {
-                console.error("Edge Function: DB error", profileError);
-                throw profileError;
-            }
+            if (profileError) throw profileError;
 
             return new Response(JSON.stringify({ user: authData.user, profile: profileData }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -109,16 +101,12 @@ Deno.serve(async (req) => {
 
         if (action === "update_password") {
             const { profile_id, password } = body;
-            console.log(`Edge Function: Updating password for ${profile_id}`);
             const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
                 profile_id,
                 { password }
             );
 
-            if (updateError) {
-                console.error("Edge Function: Password update error", updateError);
-                throw updateError;
-            }
+            if (updateError) throw updateError;
 
             return new Response(JSON.stringify({ message: "Password updated successfully", data: updateData }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,14 +115,27 @@ Deno.serve(async (req) => {
         }
 
         if (action === "delete_user") {
-            const { profile_id } = body; // Destructure from body
+            const { profile_id } = body;
             console.log(`Edge Function: Deleting user ${profile_id}`);
+
+            // 1. Explicitly delete from 'profiles' table first to ensure data consistency
+            const { error: dbError } = await supabaseAdmin
+                .from('profiles')
+                .delete()
+                .eq('id', profile_id);
+
+            if (dbError) {
+                console.error("Edge Function: DB Delete error", dbError);
+                // Continue to try deleting Auth user anyway, but log warning
+            }
+
+            // 2. Delete from Auth
             const { data, error } = await supabaseAdmin.auth.admin.deleteUser(
                 profile_id
             );
 
             if (error) {
-                console.error("Edge Function: Delete user error", error);
+                console.error("Edge Function: Auth Delete user error", error);
                 throw error;
             }
 
