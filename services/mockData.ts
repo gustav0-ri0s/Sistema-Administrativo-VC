@@ -19,15 +19,15 @@ export const mockIncidents: IncidentSummary[] = [
 ];
 
 export const mockClassrooms: Classroom[] = [
-  { id: 'c1', name: '3 años - Gotitas', level: 'Inicial', grade: '3 años', section: 'A', capacity: 15, enrolled: 12 },
-  { id: 'c2', name: '1ro Primaria A', level: 'Primaria', grade: '1', section: 'A', capacity: 25, enrolled: 22 },
+  { id: 'c1', name: '3 años - Gotitas', level: 'inicial', grade: '3 años', section: 'A', capacity: 15, enrolled: 12, active: true },
+  { id: 'c2', name: '1ro Primaria A', level: 'primaria', grade: '1', section: 'A', capacity: 25, enrolled: 22, active: true },
 ];
 
 export const mockCurricularAreas: CurricularArea[] = [
-  { 
-    id: 'a1', 
-    name: 'Matemática', 
-    level: 'Todos', 
+  {
+    id: 'a1',
+    name: 'Matemática',
+    level: 'Todos',
     order: 1,
     competencies: [
       { id: 'c1', name: 'Resuelve problemas de cantidad', description: 'Traduce cantidades...', isEvaluated: true }
@@ -40,13 +40,13 @@ export const mockCourseAssignments: CourseAssignment[] = [
 ];
 
 export const mockStudents: Student[] = [
-  { 
-    id: 'uuid-stud-1', 
-    dni: '77889900', 
-    first_name: 'Luis', 
-    last_name: 'Mendoza', 
+  {
+    id: 'uuid-stud-1',
+    dni: '77889900',
+    first_name: 'Luis',
+    last_name: 'Mendoza',
     email: 'lmendoza@valores.edu.pe',
-    birth_date: '2015-05-12', 
+    birth_date: '2015-05-12',
     gender: 'M',
     address: 'Av. Las Palmeras 450, Piura',
     academic_status: AcademicStatus.ACTIVO,

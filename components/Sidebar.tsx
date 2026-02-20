@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NAVIGATION_ITEMS, ROLE_LABELS } from '../constants';
-import { Student, AcademicStatus, Profile, UserRole } from '../types';
+import { Profile, UserRole } from '../types';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
 import { settingsService } from '../services/database.service';
 import { LogOut, X, Home } from 'lucide-react';
