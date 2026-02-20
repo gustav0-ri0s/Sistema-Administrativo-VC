@@ -71,6 +71,8 @@ export interface Classroom {
   enrolled: number;
   active: boolean;
   tutorName?: string;
+  tutorId?: string;
+  is_english_group?: boolean;
 }
 
 export interface Competency {

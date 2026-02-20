@@ -215,7 +215,7 @@ const EnrollmentDashboard: React.FC<EnrollmentDashboardProps> = ({ selectedYear:
           </div>
           <div className="p-6 space-y-4">
             {classrooms
-              .filter(r => r.name || r.grade) // Filter out completely empty rows
+              .filter(r => (r.name || r.grade) && !r.is_english_group && !r.name?.toLowerCase().includes('inglés') && !r.name?.toLowerCase().includes('ingles'))
               .slice(0, showAllClassrooms ? undefined : 6)
               .map(room => (
                 <div key={room.id} className="space-y-2 animate-in fade-in duration-300">

@@ -630,22 +630,26 @@ export const classroomService = {
             throw classroomsResponse.error;
         }
 
-        const tutorMap = new Map<string, string>();
+        const tutorMap = new Map<string, { id: string, name: string }>();
         if (tutorsResponse.data) {
             tutorsResponse.data.forEach((tutor: any) => {
                 if (tutor.tutor_classroom_id) {
-                    tutorMap.set(tutor.tutor_classroom_id.toString(), tutor.full_name);
+                    tutorMap.set(tutor.tutor_classroom_id.toString(), { id: tutor.id, name: tutor.full_name });
                 }
             });
         }
 
-        return classroomsResponse.data?.map(item => ({
-            ...item,
-            id: item.id.toString(),
-            enrolled: (item.students as any[])?.length || 0,
-            active: item.active ?? true,
-            tutorName: tutorMap.get(item.id.toString())
-        })) as Classroom[];
+        return classroomsResponse.data?.map(item => {
+            const tutorInfo = tutorMap.get(item.id.toString());
+            return {
+                ...item,
+                id: item.id.toString(),
+                enrolled: (item.students as any[])?.length || 0,
+                active: item.active ?? true,
+                tutorName: tutorInfo?.name,
+                tutorId: tutorInfo?.id
+            };
+        }) as Classroom[];
     },
 
     async create(classroom: Partial<Classroom>) {
