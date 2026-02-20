@@ -381,25 +381,43 @@ const CourseAssignmentMatrix: React.FC = () => {
                   <div className="space-y-6">
                     <h4 className="text-lg font-black text-slate-800 text-center tracking-tight">¿En qué salones dictará el docente?</h4>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      {classrooms.map(c => (
-                        <button
-                          key={c.id}
-                          onClick={() => toggleClassroom(c.id)}
-                          className={`p-6 rounded-[2rem] border-2 flex flex-col items-center gap-4 transition-all ${selectedClassroomIds.includes(c.id)
-                            ? 'border-[#57C5D5] bg-[#57C5D5]/5 shadow-xl shadow-[#57C5D5]/10'
-                            : 'border-slate-50 hover:border-slate-100'
-                            }`}
-                        >
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${selectedClassroomIds.includes(c.id) ? 'bg-[#57C5D5] text-white' : 'bg-slate-100 text-slate-300'}`}>
-                            <MapPin className="w-6 h-6" />
-                          </div>
-                          <div className="text-center">
-                            <p className="font-black text-slate-800 text-sm uppercase leading-tight">{c.name || `${c.grade} ${c.section}`}</p>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Nivel {c.level}</p>
-                          </div>
-                          {selectedClassroomIds.includes(c.id) ? <CheckSquare className="w-5 h-5 text-[#57C5D5]" /> : <Square className="w-5 h-5 text-slate-200" />}
-                        </button>
-                      ))}
+                      {classrooms.map(c => {
+                        const isEnglishGroup = c.is_english_group;
+                        const isSelected = selectedClassroomIds.includes(c.id);
+
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => toggleClassroom(c.id)}
+                            className={`p-6 rounded-[2rem] border-2 flex flex-col items-center gap-4 transition-all ${isSelected
+                              ? isEnglishGroup
+                                ? 'border-blue-500 bg-blue-50 shadow-xl shadow-blue-500/10'
+                                : 'border-[#57C5D5] bg-[#57C5D5]/5 shadow-xl shadow-[#57C5D5]/10'
+                              : isEnglishGroup
+                                ? 'border-blue-50 bg-blue-50/30 hover:border-blue-200'
+                                : 'border-slate-50 hover:border-slate-100'
+                              }`}
+                          >
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isSelected
+                              ? isEnglishGroup ? 'bg-blue-500 text-white' : 'bg-[#57C5D5] text-white'
+                              : isEnglishGroup ? 'bg-blue-100 text-blue-400' : 'bg-slate-100 text-slate-300'}`}>
+                              <MapPin className="w-6 h-6" />
+                            </div>
+                            <div className="text-center">
+                              <p className={`font-black text-sm uppercase leading-tight ${isEnglishGroup ? 'text-blue-800' : 'text-slate-800'}`}>
+                                {c.name || `${c.grade} ${c.section}`}
+                              </p>
+                              <p className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${isEnglishGroup ? 'text-blue-400' : 'text-slate-400'}`}>
+                                {isEnglishGroup ? 'Grupo de Inglés' : `Nivel ${c.level}`}
+                              </p>
+                            </div>
+                            {isSelected
+                              ? <CheckSquare className={`w-5 h-5 ${isEnglishGroup ? 'text-blue-500' : 'text-[#57C5D5]'}`} />
+                              : <Square className="w-5 h-5 text-slate-200" />
+                            }
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -457,7 +475,7 @@ const CourseAssignmentMatrix: React.FC = () => {
 
                         const availableAreas = isEnglishRoom
                           ? areas.filter(a => a.name.toLowerCase().includes('inglés') || a.name.toLowerCase().includes('ingles'))
-                          : areas;
+                          : areas.filter(a => !a.name.toLowerCase().includes('inglés') && !a.name.toLowerCase().includes('ingles'));
 
                         return (
                           <div key={cid} className="space-y-6 p-8 bg-slate-50 rounded-[3rem] border-2 border-slate-100/50 shadow-inner">
