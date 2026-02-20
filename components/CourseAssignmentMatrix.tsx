@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CourseAssignment, Classroom, CurricularArea, Profile } from '../types';
 import { classroomService, profileService, curricularAreaService, courseAssignmentService } from '../services/database.service';
+import { supabase } from '../services/supabase';
 import { useAcademicYear } from '../contexts/AcademicYearContext';
 import { useToast } from '../contexts/ToastContext';
 import { ClipboardList, Plus, User, Book, MapPin, Trash2, Clock, Loader2, CheckSquare, Square, CheckCircle2, Search, X, Check, Filter, ChevronRight, ChevronLeft, Calendar, Eye } from 'lucide-react';
@@ -159,6 +160,17 @@ const CourseAssignmentMatrix: React.FC = () => {
       }
 
       // Update Tutor Status
+      // 1. If we are assigning this teacher as tutor, we must first clear any OTHER tutor for this specific room
+      if (tutorClassroomId) {
+        const { error: clearError } = await supabase
+          .from('profiles')
+          .update({ is_tutor: false, tutor_classroom_id: null })
+          .eq('tutor_classroom_id', tutorClassroomId)
+          .neq('id', selectedTeacher.id); // Don't clear ourselves if we already were (though not necessary with unique)
+
+        if (clearError) console.error('Error clearing old tutor:', clearError);
+      }
+
       await profileService.update(selectedTeacher.id, {
         is_tutor: !!tutorClassroomId,
         tutor_classroom_id: tutorClassroomId || null // Keep as string or null
@@ -439,7 +451,11 @@ const CourseAssignmentMatrix: React.FC = () => {
                       {selectedClassroomIds.map(cid => {
                         const room = classrooms.find(r => r.id === cid);
                         const selectedAreasForThisRoom = matrix[cid] || [];
-                        const availableAreas = room?.is_english_group
+                        const isEnglishRoom = room?.is_english_group ||
+                          room?.name.toLowerCase().includes('inglés') ||
+                          room?.name.toLowerCase().includes('ingles');
+
+                        const availableAreas = isEnglishRoom
                           ? areas.filter(a => a.name.toLowerCase().includes('inglés') || a.name.toLowerCase().includes('ingles'))
                           : areas;
 
@@ -467,7 +483,7 @@ const CourseAssignmentMatrix: React.FC = () => {
                             </div>
 
                             {/* Lógica de Tutoría: No aplica a grupos de inglés */}
-                            {!room?.is_english_group && (
+                            {!isEnglishRoom && (
                               <div className="flex items-center gap-2 mb-4">
                                 {room?.tutorId && room.tutorId !== selectedTeacher?.id ? (
                                   <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-100 border-2 border-slate-200 opacity-60">
