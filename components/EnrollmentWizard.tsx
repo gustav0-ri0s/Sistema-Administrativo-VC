@@ -401,7 +401,10 @@ const EnrollmentWizard: React.FC<EnrollmentWizardProps> = ({ academicYears: prop
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Aula y Sección</label>
                     <select value={selectedClassroom} onChange={e => setSelectedClassroom(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
                       <option value="">Seleccione un aula...</option>
-                      {classrooms.map(c => <option key={c.id} value={c.id}>{c.name} ({c.enrolled}/{c.capacity})</option>)}
+                      {classrooms
+                        .filter(c => !c.is_english_group)
+                        .map(c => <option key={c.id} value={c.id}>{c.name} ({c.enrolled}/{c.capacity})</option>)
+                      }
                     </select>
                   </div>
                 </div>
