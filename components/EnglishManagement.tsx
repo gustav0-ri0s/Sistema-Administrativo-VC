@@ -57,16 +57,21 @@ const EnglishManagement: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('classrooms')
-                .select('*, students:students!students_english_classroom_id_fkey(count)')
+                .select('*, students:students!students_english_classroom_id_fkey(id, regular_classroom:classrooms!students_classroom_id_fkey(level))')
                 .eq('is_english_group', true)
                 .order('grade')
                 .order('section');
 
             if (error) throw error;
-            const formattedData = (data || []).map((c: any) => ({
-                ...c,
-                enrolled: c.students?.[0]?.count || 0
-            }));
+            const formattedData = (data || []).map((c: any) => {
+                const secondaryStudentsCount = (c.students || []).filter((s: any) =>
+                    s.regular_classroom?.level?.toLowerCase() === 'secundaria'
+                ).length;
+                return {
+                    ...c,
+                    enrolled: secondaryStudentsCount
+                };
+            });
             setEnglishClassrooms(formattedData);
         } catch (error) {
             console.error('Error fetching english classrooms:', error);
