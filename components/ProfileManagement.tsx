@@ -1020,13 +1020,28 @@ const ProfileManagement: React.FC = () => {
 
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asignaciones Académicas</p>
-                    <div className="mt-4 p-4 bg-[#57C5D5]/5 rounded-2xl border border-[#57C5D5]/10">
-                      <div className="flex items-center gap-3 text-sm font-bold text-[#57C5D5]">
-                        <ArrowRight className="w-4 h-4" />
-                        <span>0 Aulas Asignadas</span>
-                      </div>
-                      <p className="text-[10px] text-[#57C5D5]/60 mt-1 uppercase font-bold">Ver en panel de asignaciones</p>
-                    </div>
+                    {(() => {
+                      const assignedIds = new Set<string>();
+                      courseAssignments
+                        .filter(ca => ca.profileId === viewingProfile.id)
+                        .forEach(ca => assignedIds.add(ca.classroomId.toString()));
+
+                      if (viewingProfile.is_tutor && viewingProfile.tutor_classroom_id) {
+                        assignedIds.add(viewingProfile.tutor_classroom_id.toString());
+                      }
+
+                      const count = assignedIds.size;
+
+                      return (
+                        <div className="mt-4 p-4 bg-[#57C5D5]/5 rounded-2xl border border-[#57C5D5]/10">
+                          <div className="flex items-center gap-3 text-sm font-bold text-[#57C5D5]">
+                            <ArrowRight className="w-4 h-4" />
+                            <span>{count} {count === 1 ? 'Aula Asignada' : 'Aulas Asignadas'}</span>
+                          </div>
+                          <p className="text-[10px] text-[#57C5D5]/60 mt-1 uppercase font-bold">Ver en panel de asignaciones</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
