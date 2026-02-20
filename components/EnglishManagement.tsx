@@ -266,7 +266,7 @@ const EnglishManagement: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('assignment')}
                         className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'assignment'
-                            ? 'bg-blue-600 text-white shadow-md'
+                            ? 'bg-[#7CD6DE] text-slate-700 shadow-md'
                             : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
@@ -276,7 +276,7 @@ const EnglishManagement: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('classrooms')}
                         className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'classrooms'
-                            ? 'bg-blue-600 text-white shadow-md'
+                            ? 'bg-[#7CD6DE] text-slate-700 shadow-md'
                             : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
