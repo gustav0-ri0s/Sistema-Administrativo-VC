@@ -515,10 +515,15 @@ const CourseAssignmentMatrix: React.FC = () => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {availableAreas.map(area => {
-                                const isMath = area.name.toLowerCase().includes('matemática') || area.name.toLowerCase().includes('matematica');
+                                const areaNameLower = area.name.toLowerCase();
+                                const isSpecialArea =
+                                  areaNameLower.includes('matemática') ||
+                                  areaNameLower.includes('matematica') ||
+                                  areaNameLower.includes('ciencia y tecnología') ||
+                                  areaNameLower.includes('ciencia y tecnologia');
                                 const isSecondary = room?.level.toLowerCase() === 'secundaria';
 
-                                if (isMath && isSecondary && area.competencies && area.competencies.length > 0) {
+                                if (isSpecialArea && isSecondary && area.competencies && area.competencies.length > 0) {
                                   return (
                                     <div key={area.id} className="col-span-full md:col-span-2 lg:col-span-3 bg-slate-100/50 p-5 rounded-[2rem] border border-slate-200">
                                       <p className="font-black text-slate-700 mb-3 uppercase tracking-tight text-xs flex items-center gap-2">
