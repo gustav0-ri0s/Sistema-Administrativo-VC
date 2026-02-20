@@ -15,6 +15,7 @@ import RolesManager from './components/RolesManager';
 import RestrictedAccess from './components/RestrictedAccess';
 import ChangePassword from './components/ChangePassword';
 import AuthCallback from './components/AuthCallback';
+import EnglishManagement from './components/EnglishManagement';
 import { RequireAuth } from './components/RequireAuth';
 
 import { UserRole, AcademicYear, Profile } from './types';
@@ -108,6 +109,7 @@ const App: React.FC = () => {
         <Route path="/profiles" element={<ProfileManagement />} />
         <Route path="/students" element={<StudentManagement />} />
         <Route path="/classrooms" element={<ClassroomManager />} />
+        <Route path="/english" element={<EnglishManagement />} />
         <Route path="/settings" element={<SettingsManager />} />
         <Route path="/roles" element={<RolesManager />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
