@@ -86,12 +86,9 @@ const EnglishManagement: React.FC = () => {
             if (error) throw error;
 
             // Filter only secondary students
-            // const secondaryStudents = (data || []).filter((s: EnglishStudent) =>
-            //    s.regular_classroom?.level?.toLowerCase() === 'secundaria'
-            // );
-
-            // DEBUG: Show all to verify data fetch
-            const secondaryStudents = data || [];
+            const secondaryStudents = (data || []).filter((s: EnglishStudent) =>
+                s.regular_classroom?.level?.toLowerCase() === 'secundaria'
+            );
 
             setStudents(secondaryStudents);
         } catch (error) {
@@ -222,16 +219,7 @@ const EnglishManagement: React.FC = () => {
 
             {activeTab === 'assignment' && (
                 <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                    {/* DEBUG PANEL */}
-                    <div className="p-4 bg-red-50 text-red-800 text-xs font-mono border-b border-red-100">
-                        <p>DEBUG INFO:</p>
-                        <p>Total Fetched Students: {students.length}</p>
-                        <p>Filtered Students: {filteredStudents.length}</p>
-                        <p>Loading: {loading ? 'YES' : 'NO'}</p>
-                        {students.length > 0 && (
-                            <p>First Student: {JSON.stringify(students[0])}</p>
-                        )}
-                    </div>
+
 
                     {/* Filters */}
                     <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row gap-4">
