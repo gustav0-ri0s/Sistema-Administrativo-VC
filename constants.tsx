@@ -26,6 +26,7 @@ export const ROLE_ICONS: Record<string, React.ReactNode> = {
   [UserRole.SECRETARIA]: <Briefcase className="w-5 h-5 text-purple-600" />,
   [UserRole.SUPERVISOR]: <ShieldCheck className="w-5 h-5 text-blue-600" />,
   [UserRole.PSICOLOGA]: <Stethoscope className="w-5 h-5 text-pink-600" />,
+  [UserRole.DOCENTE_INGLES]: <Languages className="w-5 h-5 text-cyan-600" />,
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -36,6 +37,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SECRETARIA]: 'Secretaria',
   [UserRole.SUPERVISOR]: 'Supervisor',
   [UserRole.PSICOLOGA]: 'Psicología',
+  [UserRole.DOCENTE_INGLES]: 'Docente Inglés',
 };
 
 export const NAVIGATION_ITEMS = [

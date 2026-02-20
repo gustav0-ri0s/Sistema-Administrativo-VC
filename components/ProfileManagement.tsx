@@ -8,7 +8,8 @@ import {
   Phone, Mail, Calendar as CalendarIcon, Shield,
   CheckCircle2, XCircle, MoreVertical, Loader2,
   X, Save, Eye, EyeOff, RefreshCw, Mars, Venus,
-  ShieldCheck, ArrowRight, UserCheck, AlertTriangle
+  ShieldCheck, ArrowRight, UserCheck, AlertTriangle,
+  Languages, Stethoscope
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import AssignmentPanel from './AssignmentPanel';
@@ -19,7 +20,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.DOCENTE]: 'Docente',
   [UserRole.AUXILIAR]: 'Auxiliar',
   [UserRole.SECRETARIA]: 'Secretaria',
-  [UserRole.SUPERVISOR]: 'Supervisor'
+  [UserRole.SUPERVISOR]: 'Supervisor',
+  [UserRole.PSICOLOGA]: 'Psicología',
+  [UserRole.DOCENTE_INGLES]: 'Docente Inglés'
 };
 
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
@@ -28,7 +31,9 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   [UserRole.DOCENTE]: <Users className="w-5 h-5" />,
   [UserRole.AUXILIAR]: <UserCheck className="w-5 h-5" />,
   [UserRole.SECRETARIA]: <Mail className="w-5 h-5" />,
-  [UserRole.SUPERVISOR]: <Search className="w-5 h-5" />
+  [UserRole.SUPERVISOR]: <Search className="w-5 h-5" />,
+  [UserRole.PSICOLOGA]: <Stethoscope className="w-5 h-5" />,
+  [UserRole.DOCENTE_INGLES]: <Languages className="w-5 h-5" />
 };
 
 

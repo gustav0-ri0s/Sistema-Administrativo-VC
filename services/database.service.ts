@@ -226,7 +226,7 @@ export const profileService = {
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .eq('role', 'docente')
+            .in('role', ['docente', 'docente_ingles', 'docente_inglés'])
             .eq('active', true)
             .order('full_name', { ascending: true });
 

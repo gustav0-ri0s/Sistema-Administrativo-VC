@@ -439,6 +439,9 @@ const CourseAssignmentMatrix: React.FC = () => {
                       {selectedClassroomIds.map(cid => {
                         const room = classrooms.find(r => r.id === cid);
                         const selectedAreasForThisRoom = matrix[cid] || [];
+                        const availableAreas = room?.is_english_group
+                          ? areas.filter(a => a.name.toLowerCase().includes('inglés') || a.name.toLowerCase().includes('ingles'))
+                          : areas;
 
                         return (
                           <div key={cid} className="space-y-6 p-8 bg-slate-50 rounded-[3rem] border-2 border-slate-100/50 shadow-inner">
@@ -451,15 +454,15 @@ const CourseAssignmentMatrix: React.FC = () => {
                               </span>
                               <button
                                 onClick={() => {
-                                  const next = selectedAreasForThisRoom.length === areas.length ? [] : areas.map(a => a.id);
+                                  const next = selectedAreasForThisRoom.length === availableAreas.length ? [] : availableAreas.map(a => a.id);
                                   setMatrix(p => ({ ...p, [cid]: next }));
                                 }}
-                                className={`text-[9px] font-black uppercase tracking-[0.2em] px-5 py-2.5 rounded-xl transition-all ${selectedAreasForThisRoom.length === areas.length
+                                className={`text-[9px] font-black uppercase tracking-[0.2em] px-5 py-2.5 rounded-xl transition-all ${selectedAreasForThisRoom.length === availableAreas.length
                                   ? 'bg-red-50 text-red-500 hover:bg-red-100'
                                   : 'bg-white text-slate-400 hover:text-[#57C5D5] shadow-lg shadow-black/5'
                                   }`}
                               >
-                                {selectedAreasForThisRoom.length === areas.length ? 'Limpiar Salón' : 'Asignar Todas las Áreas'}
+                                {selectedAreasForThisRoom.length === availableAreas.length ? 'Limpiar Salón' : 'Asignar Todas las Áreas'}
                               </button>
                             </div>
 
@@ -479,7 +482,7 @@ const CourseAssignmentMatrix: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {areas.map(area => {
+                              {availableAreas.map(area => {
                                 const isMath = area.name.toLowerCase().includes('matemática') || area.name.toLowerCase().includes('matematica');
                                 const isSecondary = room?.level.toLowerCase() === 'secundaria';
 

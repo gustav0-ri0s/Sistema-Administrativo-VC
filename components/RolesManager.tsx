@@ -175,10 +175,16 @@ const RolesManager: React.FC = () => {
         if (!newRoleName.trim()) return;
 
         try {
-            const normalizedRole = newRoleName.toLowerCase().trim().replace(/\s+/g, '_');
+            // Normalización para remover acentos y caracteres especiales, convirtiendo a snake_case
+            const normalizedRole = newRoleName
+                .toLowerCase()
+                .trim()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, '_')
+                .replace(/[^a-z0-0_]/g, '');
 
-            // 1. Add to postgres enum if possible (via RCP or just trust insertion if RLS allows)
-            // For now, we'll try to insert a permission record which often forces the role existence in DB logic
+            // 1. Crear el registro de permisos (ahora la DB acepta cualquier texto)
             await rolePermissionService.update(normalizedRole as any, []);
 
             setRoles(prev => Array.from(new Set([...prev, normalizedRole])));
