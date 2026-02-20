@@ -57,13 +57,17 @@ const EnglishManagement: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('classrooms')
-                .select('*')
+                .select('*, students:students!students_english_classroom_id_fkey(count)')
                 .eq('is_english_group', true)
                 .order('grade')
                 .order('section');
 
             if (error) throw error;
-            setEnglishClassrooms(data || []);
+            const formattedData = (data || []).map((c: any) => ({
+                ...c,
+                enrolled: c.students?.[0]?.count || 0
+            }));
+            setEnglishClassrooms(formattedData);
         } catch (error) {
             console.error('Error fetching english classrooms:', error);
             showToast('error', 'Error al cargar salones de inglés');
@@ -463,7 +467,7 @@ const EnglishManagement: React.FC = () => {
                                 <div className="flex items-center gap-4 text-sm text-slate-500 font-medium mb-6">
                                     <div className="flex items-center gap-1.5">
                                         <Users className="w-4 h-4" />
-                                        <span>Capacidad: {classroom.capacity}</span>
+                                        <span>Designados: {classroom.enrolled}/{classroom.capacity}</span>
                                     </div>
                                 </div>
 
