@@ -26,6 +26,10 @@ import { AcademicYearProvider, useAcademicYear } from './contexts/AcademicYearCo
 import { ToastProvider } from './contexts/ToastContext';
 import { Menu, School, Calendar, ChevronDown, CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
+const IDLE_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in ms
+const CHECK_INTERVAL = 60 * 1000; // 1 minute in ms
+const ACTIVITY_KEY = 'vc_last_activity';
+
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -98,6 +102,46 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Idle Timeout Logic
+  React.useEffect(() => {
+    if (!currentUser) return;
+
+    const checkIdleTimeout = () => {
+      const lastActivity = localStorage.getItem(ACTIVITY_KEY);
+      if (lastActivity) {
+        const timeSinceLastActivity = Date.now() - parseInt(lastActivity, 10);
+        if (timeSinceLastActivity > IDLE_TIMEOUT) {
+          console.warn('Idle timeout reached, signing out...');
+          handleReset();
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (checkIdleTimeout()) return;
+
+    const updateActivity = () => {
+      localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
+    };
+
+    updateActivity();
+
+    const events = ['mousedown', 'keydown', 'mousemove', 'scroll', 'touchstart'];
+    events.forEach(eventName => {
+      window.addEventListener(eventName, updateActivity);
+    });
+
+    const interval = setInterval(checkIdleTimeout, CHECK_INTERVAL);
+
+    return () => {
+      events.forEach(eventName => {
+        window.removeEventListener(eventName, updateActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [currentUser]);
+
   const renderContent = () => {
     return (
       <Routes>
@@ -119,10 +163,16 @@ const App: React.FC = () => {
 
 
   const handleReset = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error during signOut:', err);
+    }
+    setCurrentUser(null);
+    localStorage.removeItem(ACTIVITY_KEY);
     localStorage.clear();
     sessionStorage.clear();
-    const portal = import.meta.env.VITE_PORTAL_URL || "https://valores-y-ciencias.vercel.app";
+    const portal = import.meta.env.VITE_PORTAL_URL || "https://portal-vc-academico.vercel.app";
     window.location.href = portal;
   };
 

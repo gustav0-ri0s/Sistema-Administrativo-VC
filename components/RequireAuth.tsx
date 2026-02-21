@@ -29,9 +29,7 @@ export function RequireAuth({ children, onUserLoaded }: RequireAuthProps) {
 
                 if (!session) {
                     console.log("RequireAuth: No session found, redirecting to portal");
-                    const portal = import.meta.env.VITE_PORTAL_URL || "https://valores-y-ciencias.vercel.app";
-                    const currentUrl = window.location.href;
-                    window.location.href = `${portal}/login?returnTo=${encodeURIComponent(currentUrl)}`;
+                    redirectToPortal();
                     return;
                 }
 
@@ -40,7 +38,7 @@ export function RequireAuth({ children, onUserLoaded }: RequireAuthProps) {
 
                 if (!profile) {
                     console.error("RequireAuth: Profile not found");
-                    setAuthorized(false);
+                    redirectToPortal();
                 } else if (!ALLOWED_ROLES.includes(profile.role)) {
                     console.warn("RequireAuth: Role not authorized:", profile.role);
                     setUserProfile(profile);
@@ -52,10 +50,17 @@ export function RequireAuth({ children, onUserLoaded }: RequireAuthProps) {
                 }
             } catch (error) {
                 console.error("RequireAuth: Error during validation:", error);
+                redirectToPortal();
             } finally {
                 setLoading(false);
             }
         })();
+
+        function redirectToPortal() {
+            const portal = import.meta.env.VITE_PORTAL_URL || "https://portal-vc-academico.vercel.app";
+            const currentUrl = window.location.href;
+            window.location.href = `${portal}/login?returnTo=${encodeURIComponent(currentUrl)}`;
+        }
     }, [onUserLoaded]);
 
     if (loading) {
