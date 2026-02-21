@@ -7,7 +7,7 @@ export enum UserRole {
   SECRETARIA = 'secretaria',
   SUPERVISOR = 'supervisor',
   PSICOLOGA = 'psicologa',
-  DOCENTE_INGLES = 'docente_inglés'
+  DOCENTE_INGLES = 'docente_ingles'
 }
 
 export enum AcademicStatus {
