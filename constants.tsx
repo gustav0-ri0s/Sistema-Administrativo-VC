@@ -41,14 +41,14 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const NAVIGATION_ITEMS = [
-  { id: 'dashboard', label: 'Inicio', icon: <FileBarChart className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.SECRETARIA] },
+  { id: 'dashboard', label: 'Inicio', icon: <FileBarChart className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.SECRETARIA, UserRole.DOCENTE_INGLES] },
   { id: 'academic-year', label: 'Año Académico', icon: <CalendarDays className="w-5 h-5" />, roles: [UserRole.ADMIN] },
   { id: 'enrollment', label: 'Matrícula', icon: <UserPlus className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.SECRETARIA] },
   { id: 'areas', label: 'Áreas y Competencias', icon: <Layers className="w-5 h-5" />, roles: [UserRole.ADMIN] }, // Cambiado de Courses
   { id: 'course-assignments', label: 'Carga Horaria', icon: <ClipboardList className="w-5 h-5" />, roles: [UserRole.ADMIN] },
   { id: 'profiles', label: 'Personal', icon: <Users className="w-5 h-5" />, roles: [UserRole.ADMIN] },
   { id: 'students', label: 'Estudiantes', icon: <GraduationCap className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.SECRETARIA] },
-  { id: 'english', label: 'Gestión de Inglés', icon: <Languages className="w-5 h-5" />, roles: [UserRole.ADMIN] },
+  { id: 'english', label: 'Gestión de Inglés', icon: <Languages className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.DOCENTE_INGLES] },
   { id: 'classrooms', label: 'Aulas', icon: <BookOpen className="w-5 h-5" />, roles: [UserRole.ADMIN] },
   { id: 'settings', label: 'Ajustes', icon: <Settings className="w-5 h-5" />, roles: [UserRole.ADMIN] },
   { id: 'roles', label: 'Roles y Permisos', icon: <ShieldCheck className="w-5 h-5" />, roles: [UserRole.ADMIN] },

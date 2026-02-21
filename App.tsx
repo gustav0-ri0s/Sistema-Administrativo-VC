@@ -71,11 +71,15 @@ const App: React.FC = () => {
         setUserPermissions(perms.modules);
       } else if (userProfile.role === UserRole.ADMIN) {
         setUserPermissions(['dashboard', 'academic-year', 'enrollment', 'areas', 'course-assignments', 'profiles', 'students', 'english', 'classrooms', 'settings', 'roles']);
+      } else if (userProfile.role === UserRole.DOCENTE_INGLES) {
+        setUserPermissions(['dashboard', 'english']);
       }
     } catch (e) {
       console.warn('App: Permissions load error, using default');
       if (userProfile.role === UserRole.ADMIN) {
         setUserPermissions(['dashboard', 'academic-year', 'enrollment', 'areas', 'course-assignments', 'profiles', 'students', 'english', 'classrooms', 'settings', 'roles']);
+      } else if (userProfile.role === UserRole.DOCENTE_INGLES) {
+        setUserPermissions(['dashboard', 'english']);
       }
     }
     refreshYears();

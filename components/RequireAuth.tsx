@@ -9,7 +9,8 @@ const ALLOWED_ROLES = [
     UserRole.ADMIN,
     UserRole.SUBDIRECTOR,
     UserRole.SUPERVISOR,
-    UserRole.SECRETARIA
+    UserRole.SECRETARIA,
+    UserRole.DOCENTE_INGLES
 ];
 
 interface RequireAuthProps {
