@@ -193,6 +193,7 @@ const ProfileManagement: React.FC = () => {
           dni: newProfile.dni!,
           force_password_change: newProfile.force_password_change || false,
           phone: newProfile.phone,
+          personal_email: newProfile.personal_email,
           address: newProfile.address,
           gender: newProfile.gender,
           birth_date: newProfile.birth_date
@@ -661,6 +662,19 @@ const ProfileManagement: React.FC = () => {
                       required
                       value={newProfile.email || ''}
                       onChange={(e) => setNewProfile({ ...newProfile, email: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Correo Personal</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input
+                      type="email"
+                      value={newProfile.personal_email || ''}
+                      onChange={(e) => setNewProfile({ ...newProfile, personal_email: e.target.value })}
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                     />
                   </div>
