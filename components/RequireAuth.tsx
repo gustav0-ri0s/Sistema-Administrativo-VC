@@ -60,7 +60,7 @@ export function RequireAuth({ children, onUserLoaded }: RequireAuthProps) {
         function redirectToPortal() {
             const portal = import.meta.env.VITE_PORTAL_URL || "https://portal-vc-academico.vercel.app";
             const currentUrl = window.location.href;
-            window.location.href = `${portal}/login?returnTo=${encodeURIComponent(currentUrl)}`;
+            window.location.href = `${portal}?view=login&returnTo=${encodeURIComponent(currentUrl)}`;
         }
     }, [onUserLoaded]);
 

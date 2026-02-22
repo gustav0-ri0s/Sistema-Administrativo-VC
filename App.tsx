@@ -177,7 +177,7 @@ const App: React.FC = () => {
     localStorage.clear();
     sessionStorage.clear();
     const portal = import.meta.env.VITE_PORTAL_URL || "https://portal-vc-academico.vercel.app";
-    window.location.href = portal;
+    window.location.href = `${portal}?view=login`;
   };
 
   return (
